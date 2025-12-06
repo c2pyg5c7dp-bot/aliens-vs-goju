@@ -1,5 +1,5 @@
 // Main entry point with Discord SDK integration
-import { setupDiscordSdk, getCurrentUser, updateActivity, getParticipants } from './discordSdk.js';
+import { setupDiscordSdk, getCurrentUser, getParticipants } from './discordSdk.js';
 
 // Store Discord SDK globally for game access
 window.discordSdk = null;
@@ -40,7 +40,8 @@ async function init() {
     if (discordSdk) {
       console.log('Discord SDK initialized!');
       console.log('Current user:', auth.user);
-      await updateActivity('Playing Aliens vs Goju');
+      window.discordSdk = discordSdk;
+      window.discordAuth = auth;
       setupCoopButton(discordSdk, auth);
     } else {
       console.log('Running in standalone mode - disabling co-op');
@@ -85,9 +86,6 @@ function setupCoopButton(discordSdk, auth) {
         
         if (startScreen) startScreen.style.display = 'none';
         if (lobbyScreen) lobbyScreen.style.display = 'flex';
-        
-        // Update activity
-        await updateActivity('In Co-op Lobby');
         
         // Get and display participants
         updateParticipantsList(discordSdk);
@@ -134,11 +132,6 @@ function initializeCoopUI() {
       
       if (lobbyScreen) lobbyScreen.style.display = 'none';
       if (charSelectScreen) charSelectScreen.style.display = 'flex';
-      
-      // Update activity
-      if (window.discordSdk) {
-        updateActivity('Playing Co-op');
-      }
     });
   }
   
