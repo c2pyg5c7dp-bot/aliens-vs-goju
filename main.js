@@ -19,17 +19,8 @@ function loadGameNow() {
     loadingScreen.style.display = 'none';
   }
   
-  const gameScript = document.createElement('script');
-  gameScript.src = './game_new.js';
-  gameScript.onload = () => {
-    console.log('Game loaded successfully!');
-    setTimeout(() => initializeCoopUI(), 500);
-  };
-  gameScript.onerror = (err) => {
-    console.error('Failed to load game script:', err);
-    alert('Failed to load game. Check console for errors.');
-  };
-  document.body.appendChild(gameScript);
+  // Game script is already loaded via HTML, just initialize co-op UI
+  setTimeout(() => initializeCoopUI(), 500);
 }
 
 async function init() {
