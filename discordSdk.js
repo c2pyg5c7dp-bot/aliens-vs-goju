@@ -9,6 +9,9 @@ export async function setupDiscordSdk() {
   const urlParams = new URLSearchParams(window.location.search);
   const isInDiscord = urlParams.has('frame_id') || window.parent !== window;
   
+  // Check if on iOS
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  
   if (!isInDiscord) {
     console.warn('Not running in Discord - using standalone mode');
     // Return mock objects for standalone mode
@@ -24,24 +27,46 @@ export async function setupDiscordSdk() {
       }
     };
   }
+  
+  // Show message if on unsupported platform
+  if (isIOS && isInDiscord) {
+    console.warn('Discord Activities may have limited support on iOS');
+    // Still try to initialize but provide fallback
+  }
 
-  discordSdk = new DiscordSDK(import.meta.env.VITE_DISCORD_CLIENT_ID);
+  try {
+    discordSdk = new DiscordSDK(import.meta.env.VITE_DISCORD_CLIENT_ID);
 
-  await discordSdk.ready();
-  console.log("Discord SDK is ready");
+    await discordSdk.ready();
+    console.log("Discord SDK is ready");
 
-  // For basic activities, we don't need OAuth - just use the ready state
-  // Get basic user info from the SDK without authentication
-  auth = {
-    user: {
-      username: 'Discord User',
-      id: 'discord-user',
-      avatar: null,
-      discriminator: '0000'
-    }
-  };
+    // For basic activities, we don't need OAuth - just use the ready state
+    // Get basic user info from the SDK without authentication
+    auth = {
+      user: {
+        username: 'Discord User',
+        id: 'discord-user',
+        avatar: null,
+        discriminator: '0000'
+      }
+    };
 
-  return { discordSdk, auth };
+    return { discordSdk, auth };
+  } catch (error) {
+    console.error('Failed to initialize Discord SDK:', error);
+    // Return standalone mode on error
+    return {
+      discordSdk: null,
+      auth: {
+        user: {
+          username: 'Player',
+          id: 'standalone',
+          avatar: null,
+          discriminator: '0000'
+        }
+      }
+    };
+  }
 }
 
 export function getDiscordSdk() {
