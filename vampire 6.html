@@ -1,0 +1,500 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vampire Survivors  Lite</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="startScreen" class="overlay">
+    <div class="panel">
+      <h1>Vampire Survivors Lite</h1>
+      <div id="leaderboardStart" class="leaderboard">
+        <h3>Leaderboard</h3>
+        <ol id="leaderboardList"></ol>
+      </div>
+      <div class="controls">
+        <button id="startBtn">Start Game</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="charSelectScreen" class="overlay" style="display:none">
+    <div class="panel">
+      <h1>Select Your Character</h1>
+      <div class="character-grid">
+        <div class="character-card" onclick="startGameWithCharacter('player')">
+          <h3>Player</h3>
+          <p class="char-desc">Balanced stats</p>
+          <div class="char-stats">
+            <div>Health: 12</div>
+            <div>Speed: 220</div>
+            <div>Damage: 1.0</div>
+            <div>Fire Rate: 0.12</div>
+          </div>
+        </div>
+        <div class="character-card" onclick="startGameWithCharacter('tank')">
+          <h3>Tank</h3>
+          <p class="char-desc">High health, slow but powerful</p>
+          <div class="char-stats">
+            <div>Health: 20</div>
+            <div>Speed: 180</div>
+            <div>Damage: 1.5</div>
+            <div>Fire Rate: 0.18</div>
+          </div>
+        </div>
+        <div class="character-card" onclick="startGameWithCharacter('speedster')">
+          <h3>Speedster</h3>
+          <p class="char-desc">Fast and agile with better pickup</p>
+          <div class="char-stats">
+            <div>Health: 8</div>
+            <div>Speed: 300</div>
+            <div>Damage: 0.7</div>
+            <div>Fire Rate: 0.08</div>
+          </div>
+        </div>
+        <div class="character-card" onclick="startGameWithCharacter('glass_cannon')">
+          <h3>Glass Cannon</h3>
+          <p class="char-desc">High damage but very fragile</p>
+          <div class="char-stats">
+            <div>Health: 6</div>
+            <div>Speed: 200</div>
+            <div>Damage: 2.0</div>
+            <div>Fire Rate: 0.10</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ui">
+    <div id="hud">
+      <div class="hud-stat" style="display:none">
+        <span class="hud-icon">💎</span>
+        <span class="hud-label">Score</span>
+        <span id="score" class="hud-value">0</span>
+      </div>
+      <div class="hud-stat" style="display:none">
+        <span class="hud-icon">❤️</span>
+        <span class="hud-label">Health</span>
+        <div class="health-bar-container">
+          <div id="healthBar" class="health-bar"></div>
+          <span id="health" class="hud-value-overlay">10/10</span>
+        </div>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-icon">🌊</span>
+        <span class="hud-label">Wave</span>
+        <span id="wave" class="hud-value">0</span>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-icon">⏱️</span>
+        <span class="hud-label">Time</span>
+        <span id="timer" class="hud-value">0s</span>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-icon">⚡</span>
+        <span class="hud-label">Dash</span>
+        <span id="dashCharges" class="hud-value">●●●</span>
+      </div>
+      <div id="powerups" class="hud-stat" style="display:block; flex-direction:column; align-items:flex-start;"></div>
+      <div class="buttons">
+        <button id="pauseBtn">⏸ Pause</button>
+        <button id="restartBtn">🔄 Reset</button>
+        <button id="leaderboardBtn">🏆 Board</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    #hud {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: linear-gradient(135deg, rgba(20, 20, 40, 0.95), rgba(40, 20, 60, 0.95));
+      padding: 8px;
+      border-radius: 6px;
+      border: 2px solid rgba(138, 43, 226, 0.6);
+      box-shadow: 0 0 20px rgba(138, 43, 226, 0.4), inset 0 0 20px rgba(0, 0, 0, 0.3);
+      font-family: 'Courier New', monospace;
+      color: #fff;
+      min-width: 120px;
+      backdrop-filter: blur(5px);
+    }
+
+    .hud-stat {
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+      padding: 4px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      transition: all 0.3s;
+    }
+
+    .hud-stat:hover {
+      background: rgba(138, 43, 226, 0.2);
+      transform: translateX(-5px);
+    }
+
+    .hud-icon {
+      font-size: 14px;
+      margin-right: 6px;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    .hud-label {
+      font-size: 9px;
+      color: #aaa;
+      margin-right: 4px;
+      min-width: 32px;
+    }
+
+    .hud-value {
+      font-size: 12px;
+      font-weight: bold;
+      color: #0ff;
+      text-shadow: 0 0 5px #0ff;
+      margin-left: auto;
+    }
+
+    .health-bar-container {
+      flex: 1;
+      height: 18px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 9px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .health-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #ff4444, #ff6666);
+      border-radius: 9px;
+      transition: width 0.5s;
+      box-shadow: 0 0 10px #ff4444;
+      width: 100%;
+    }
+
+    .hud-value-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 10px;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 0 0 3px #000, 1px 1px 2px #000;
+      pointer-events: none;
+    }
+
+    .hud-powerups {
+      margin: 8px 0;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 6px;
+      min-height: 30px;
+      font-size: 10px;
+    }
+
+    #hud .buttons {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    #hud .buttons button {
+      flex: 1;
+      padding: 4px 6px;
+      background: linear-gradient(135deg, #6a0dad, #8a2be2);
+      border: 1px solid #a855f7;
+      border-radius: 3px;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 8px;
+      text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+    }
+
+    #hud .buttons button:hover {
+      background: linear-gradient(135deg, #8a2be2, #9370db);
+      box-shadow: 0 0 15px rgba(138, 43, 226, 0.6);
+      transform: translateY(-2px);
+    }
+
+    #hud .buttons button:active {
+      transform: translateY(0);
+    }
+
+    .character-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-top: 20px;
+      max-width: 800px;
+    }
+
+    .character-card {
+      background: linear-gradient(135deg, rgba(40, 20, 60, 0.95), rgba(20, 20, 40, 0.95));
+      border: 2px solid rgba(138, 43, 226, 0.6);
+      border-radius: 10px;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 0 15px rgba(138, 43, 226, 0.3);
+    }
+
+    .character-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(138, 43, 226, 1);
+      box-shadow: 0 0 25px rgba(138, 43, 226, 0.6);
+    }
+
+    .character-card h3 {
+      margin: 0 0 10px 0;
+      color: #fff;
+      font-size: 24px;
+      text-align: center;
+    }
+
+    .char-desc {
+      color: #aaa;
+      font-style: italic;
+      text-align: center;
+      margin: 0 0 15px 0;
+      font-size: 14px;
+    }
+
+    .char-stats {
+      color: #fff;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .char-stats div {
+      padding: 3px 0;
+    }
+  </style>
+
+  <canvas id="game"></canvas>
+
+  <div id="rewardModal" class="modal" style="display:none">
+    <div class="modal-content">
+      <h3>Choose a Reward</h3>
+      <div class="choices">
+        <button id="rewardHealth">+Health</button>
+        <button id="rewardDamage">+Damage</button>
+        <button id="rewardRate">Faster Fire</button>
+        <button id="rewardSpeed">+Speed</button>
+        <button id="rewardMagnet">+Magnet</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="testRunner" style="position:fixed; bottom:10px; right:10px; width:280px; max-height:400px; background:#222; color:#0f0; border:2px solid #0f0; padding:8px; font-family:monospace; font-size:11px; overflow-y:auto; z-index:999; display:none">
+    <div style="font-weight:bold; margin-bottom:6px">Debug Console</div>
+    <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center">
+      <label style="font-size:11px"><input type="checkbox" id="dbgAuto"/> Live</label>
+      <button id="dbgLogState" style="flex:1; padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Log State</button>
+    </div>
+    <div id="dbgStats" style="font-size:12px; color:#9f9; margin-bottom:6px; line-height:1.25">
+      <div>Score: <span id="dbgScore">0</span></div>
+      <div>Wave: <span id="dbgWave">0</span></div>
+      <div>Enemies: <span id="dbgEnemies">0</span>  Projectiles: <span id="dbgProjectiles">0</span></div>
+      <div>Powerups: <span id="dbgPowerups">0</span>  Gems: <span id="dbgGems">0</span></div>
+      <div>Player HP: <span id="dbgHP">0</span></div>
+      <div>Fired Shots: <span id="dbgFired">0</span></div>
+    </div>
+    <div style="margin-bottom:8px; padding:8px; background:#111; border:1px solid #0f0; border-radius:4px">
+      <div style="font-weight:bold; margin-bottom:4px; color:#ff0">Enemy Speed Control</div>
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px">
+        <label style="flex:1">Speed: <span id="enemySpeedValue">198</span></label>
+        <button id="enemySpeedDec" style="padding:4px 8px; background:#f00; color:#000; border:none; cursor:pointer">-</button>
+        <button id="enemySpeedInc" style="padding:4px 8px; background:#0f0; color:#000; border:none; cursor:pointer">+</button>
+      </div>
+      <input type="range" id="enemySpeedSlider" min="50" max="300" value="198" step="1" style="width:100%"/>
+      <div style="font-size:10px; color:#999; margin-top:2px">Player: 220 | Current: <span id="enemySpeedPercent">90%</span></div>
+    </div>
+    <div id="testOutput" style="background:#000; color:#0f0; padding:6px; height:120px; overflow:auto; border:1px solid #0f0"></div>
+    <div style="display:flex; gap:6px; margin-top:6px">
+      <button id="dbgClear" style="padding:4px; background:#333; color:#0f0; border:1px solid #0f0; cursor:pointer">Clear</button>
+      <button id="runTestBtn" style="padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Run Tests</button>
+      <button id="dbgSpawnWave" style="padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Spawn Wave</button>
+    </div>
+    <div style="display:flex; gap:6px; margin-top:6px">
+      <button id="dbgLoadAnim" style="flex:1; padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Load Anim</button>
+      <select id="dbgAnimList" style="flex:1; padding:4px; background:#111; color:#0f0; border:1px solid #0f0"></select>
+      <button id="dbgSpawnAnim" style="flex:1; padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Spawn Anim</button>
+    </div>
+    <div style="display:flex; gap:6px; margin-top:6px">
+      <button id="dbgSimFire" style="flex:1; padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Sim Fire</button>
+      <button id="dbgStart" style="flex:1; padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Start</button>
+    </div>
+    <div style="margin-top:8px; padding:8px; background:#111; border:1px solid #0f0; border-radius:4px">
+      <div style="font-weight:bold; margin-bottom:4px; color:#ff0">Spawn Powerups</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px">
+        <button id="spawnMinigun" style="padding:4px; background:#7fe8ff; color:#000; border:none; cursor:pointer; font-size:10px">Minigun</button>
+        <button id="spawnRocket" style="padding:4px; background:#ffb27f; color:#000; border:none; cursor:pointer; font-size:10px">Rocket</button>
+        <button id="spawnShotgun" style="padding:4px; background:#d19cff; color:#000; border:none; cursor:pointer; font-size:10px">Shotgun</button>
+        <button id="spawnFireball" style="padding:4px; background:#4da6ff; color:#000; border:none; cursor:pointer; font-size:10px">Fireball</button>
+        <button id="spawnSword" style="padding:4px; background:#c0c0c0; color:#000; border:none; cursor:pointer; font-size:10px">Sword</button>
+        <button id="spawnSpeed" style="padding:4px; background:#00ff88; color:#000; border:none; cursor:pointer; font-size:10px">Speed</button>
+        <button id="spawnX2Score" style="padding:4px; background:#ffa500; color:#000; border:none; cursor:pointer; font-size:10px; font-weight:bold">X2 SCORE</button>
+        <button id="spawnNuke" style="padding:4px; background:#ffff00; color:#000; border:none; cursor:pointer; font-size:10px; font-weight:bold">NUKE</button>
+        <button id="spawnGem" style="padding:4px; background:#fff28f; color:#000; border:none; cursor:pointer; font-size:10px">Gem</button>
+        <button id="spawnRedAlien" style="padding:4px; background:#ff3333; color:#fff; border:none; cursor:pointer; font-size:10px; font-weight:bold">RED ALIEN</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game_new.js"></script>
+  <script src="animations/player-animations.js"></script>
+  <script src="animations/enemy-animations.js"></script>
+  <script src="animations/golem-animations.js"></script>
+  <script src="animations/redalien-animations.js"></script>
+  <script>
+    // Enemy speed debug control
+    window.ENEMY_BASE_SPEED = 198; // Global variable for enemy speed
+    
+    const enemySpeedSlider = document.getElementById('enemySpeedSlider');
+    const enemySpeedValue = document.getElementById('enemySpeedValue');
+    const enemySpeedPercent = document.getElementById('enemySpeedPercent');
+    const enemySpeedInc = document.getElementById('enemySpeedInc');
+    const enemySpeedDec = document.getElementById('enemySpeedDec');
+    
+    function updateEnemySpeed(speed){
+      window.ENEMY_BASE_SPEED = parseInt(speed);
+      enemySpeedValue.textContent = speed;
+      enemySpeedSlider.value = speed;
+      const percent = Math.round((speed / 220) * 100);
+      enemySpeedPercent.textContent = percent + '%';
+      
+      // Update existing enemies
+      if(window.enemies){
+        window.enemies.forEach(e => {
+          e.speed = window.ENEMY_BASE_SPEED;
+        });
+      }
+      console.log('Enemy speed updated to:', speed);
+    }
+    
+    if(enemySpeedSlider){
+      enemySpeedSlider.addEventListener('input', (e) => {
+        updateEnemySpeed(e.target.value);
+      });
+    }
+    
+    if(enemySpeedInc){
+      enemySpeedInc.addEventListener('click', () => {
+        const newSpeed = Math.min(300, window.ENEMY_BASE_SPEED + 10);
+        updateEnemySpeed(newSpeed);
+      });
+    }
+    
+    if(enemySpeedDec){
+      enemySpeedDec.addEventListener('click', () => {
+        const newSpeed = Math.max(50, window.ENEMY_BASE_SPEED - 10);
+        updateEnemySpeed(newSpeed);
+      });
+    }
+    
+    // Load animations when scripts are ready
+    setTimeout(()=>{
+      if(window.playerAnimController){
+        console.info('Loading player animations...');
+        window.playerAnimController.loadAll();
+      }
+      if(window.enemyAnimController){
+        console.info('Loading enemy animations...');
+        window.enemyAnimController.loadAll();
+      }
+    }, 100);
+
+    // Test Runner
+    const testOutput = document.getElementById('testOutput');
+    const testRunner = document.getElementById('testRunner');
+    const runTestBtn = document.getElementById('runTestBtn');
+
+    function log(msg, type='info'){ const div = document.createElement('div'); div.style.color = type === 'pass'? '#0f0' : type === 'fail'? '#f00' : '#0f0'; div.textContent = msg; testOutput.appendChild(div); testOutput.scrollTop = testOutput.scrollHeight; }
+    function test(name, fn){ try{ fn(); log(`✓ ${name}`, 'pass'); } catch(e){ log(`✗ ${name}: ${e.message}`, 'fail'); } }
+
+    if(runTestBtn){
+      runTestBtn.addEventListener('click', ()=>{
+        testOutput.innerHTML = '';
+        log('Starting tests...', 'info');
+
+        // Wait for game to be ready
+        if(!window.player || !window.resetGame || !window.input){
+          log('⚠ Game not ready yet. Waiting...', 'info');
+          setTimeout(()=>{
+            if(runTestBtn) runTestBtn.click();
+          }, 500);
+          return;
+        }
+
+        // Test 1: Player exists
+        test('Player initialized', ()=>{ if(!window.player || !window.player.x) throw new Error('Player not found'); });
+
+        // Test 2: Game state exists
+        test('Game state exists', ()=>{ if(typeof window.running === 'undefined') throw new Error('Game state missing'); });
+
+        // Test 3: Reset game
+        test('Reset game', ()=>{ if(typeof window.resetGame !== 'function') throw new Error('resetGame not found'); window.resetGame(); if(window.score !== 0) throw new Error('Score not reset'); if(window.enemies.length !== 0) throw new Error('Enemies not cleared'); });
+
+        // Test 4: Spawn wave (must call resetGame first)
+        test('Spawn wave', ()=>{ 
+          window.resetGame(); // Reset game state before spawning wave
+          if(typeof window.startWave !== 'function') throw new Error('startWave not found'); 
+          if(!window.diffMod || !window.diffMod.spawnRate) throw new Error('Difficulty modifiers not set');
+          const beforeCount = window.enemies.length;
+          window.startWave(); 
+          const afterCount = window.enemies.length;
+          if(afterCount <= beforeCount) throw new Error(`Wave did not spawn enemies. Before: ${beforeCount}, After: ${afterCount}`); 
+        });
+
+        // Test 5: Fire projectile (must call resetGame first)
+        test('Fire projectile', ()=>{ 
+          window.resetGame(); // Reset game state before firing
+          window.player.fireTimer = -1; 
+          window.input.mouseX = window.player.x + 100; 
+          window.input.mouseY = window.player.y; 
+          if(typeof window.update !== 'function') throw new Error('update function not found');
+          window.update(0.016); 
+          if(window.projectiles.length === 0) throw new Error('No projectile fired: ' + window.projectiles.length); 
+        });
+
+        // Test 6: Collision (manual spawn)
+        test('Spawn gem', ()=>{ const gem = new window.Gem(window.player.x + 5, window.player.y + 5, 10); window.gems.push(gem); if(window.gems.length === 0) throw new Error('Gem not added'); });
+
+        // Test 7: Update simulation
+        test('Update simulation (10 frames)', ()=>{ for(let i=0; i<10; i++){ window.update(0.016); } log(`  Score: ${window.score}, Enemies: ${window.enemies.length}, Projectiles: ${window.projectiles.length}`, 'info'); });
+
+        // Test 8: Leaderboard functions
+        test('Leaderboard save/load', ()=>{ window.saveHighScore('TestPlayer', 500); const scores = window.getHighScores(); if(!scores.find(s=>s.name==='TestPlayer' && s.score===500)) throw new Error('Score not saved'); });
+
+        // Test 9: Reward modal
+        test('Reward modal exists', ()=>{ if(!document.getElementById('rewardModal')) throw new Error('Reward modal not found'); });
+
+        // Test 10: Draw function
+        test('Draw function callable', ()=>{ if(typeof window.draw !== 'function') throw new Error('Draw not found'); window.draw(); });
+
+        log('Tests complete!', 'pass');
+      });
+    } else {
+      console.warn('runTestBtn not found in DOM; tests button disabled.');
+    }
+
+    // Show test runner on load after a delay
+    setTimeout(()=>{ testRunner.style.display = 'block'; }, 500);
+  </script>
+</body>
+</html>

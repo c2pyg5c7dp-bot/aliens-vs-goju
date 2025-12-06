@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vampire Survivors — Lite</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="ui">
+    <div id="hud">
+      <span id="score">Score: 0</span>
+      <span id="health">Health: 10</span>
+      <span id="powerups" aria-live="polite"></span>
+      <button id="startBtn">Start</button>
+      <button id="pauseBtn" style="display:none">Pause</button>
+      <button id="leaderboardBtn">Leaderboard</button>
+      <button id="restartBtn" style="display:none">Restart</button>
+    </div>
+    <div id="instructions">Move: WASD / Arrow keys • Aim: Mouse • Auto-fire</div>
+  </div>
+
+  <canvas id="game"></canvas>
+
+  <!-- Leaderboard modal -->
+  <div id="leaderboardModal" class="modal" style="display:none">
+    <div class="modal-content">
+      <button id="closeLeaderboardBtn" class="close">×</button>
+      <h3>High Scores</h3>
+      <div id="recentScoreBox" style="text-align:center;margin-bottom:8px;display:none">
+        <div>Your Score: <strong id="recentScoreDisplay">0</strong></div>
+        <div style="margin-top:8px">
+          <input id="nameInput" placeholder="Your name" style="padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:var(--fg)">
+          <button id="saveScoreBtn">Save Score</button>
+        </div>
+      </div>
+      <ol id="leaderboardList"></ol>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+        <button id="clearScoresBtn">Clear Scores</button>
+        <button id="closeLeaderboardBtn2">Close</button>
+      </div>
+    </div>
+  </div>
+  <!-- Reward modal shown when player hits score thresholds -->
+  <div id="rewardModal" class="modal" style="display:none">
+    <div class="modal-content">
+      <h3>Choose a Reward</h3>
+      <p style="text-align:center;margin:6px 0 12px 0">You reached a score milestone — pick one permanent upgrade:</p>
+      <div style="display:flex;gap:12px;justify-content:center">
+        <button id="rewardHealth">Health Up</button>
+        <button id="rewardDamage">Damage Up</button>
+        <button id="rewardRate">Fire Rate Up</button>
+      </div>
+      <div style="text-align:center;margin-top:12px"><button id="closeRewardBtn">Close</button></div>
+    </div>
+  </div>
+  <script>
+    // Diagnostic helper: show errors on-page and force-show leaderboard if present.
+    window.addEventListener('error', function(ev){
+      try{
+        console.error('Captured error:', ev.error || ev.message);
+        var msg = document.createElement('div');
+        msg.style.position = 'fixed'; msg.style.left = '12px'; msg.style.bottom = '12px'; msg.style.zIndex = 99999;
+        msg.style.background = 'rgba(220,20,60,0.95)'; msg.style.color='white'; msg.style.padding='10px 14px'; msg.style.borderRadius='8px';
+        msg.textContent = 'Game error: ' + (ev.error && ev.error.message ? ev.error.message : ev.message);
+        document.body.appendChild(msg);
+      }catch(e){ console.error(e); }
+    });
+    // Force-visible check for leaderboard modal on page load (helps detect missing element IDs)
+    window.addEventListener('DOMContentLoaded', function(){
+      try{
+        var lm = document.getElementById('leaderboardModal');
+        if(lm){ lm.style.display = 'flex'; console.log('Diagnostic: leaderboard modal forced visible'); }
+        else console.log('Diagnostic: leaderboard modal not found (check index.html IDs)');
+      }catch(e){ console.error(e); }
+    });
+  </script>
+  <script src="game.js"></script>
+</body>
+</html>

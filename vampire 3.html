@@ -1,0 +1,145 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vampire Survivors  Lite</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="startScreen" class="overlay">
+    <div class="panel">
+      <h1>Vampire Survivors  Lite</h1>
+      <div id="leaderboardStart" class="leaderboard">
+        <h3>Leaderboard</h3>
+        <ol id="leaderboardList"></ol>
+      </div>
+      <div class="difficulty-select">
+        <h3>Select Difficulty</h3>
+        <div class="difficulty-buttons">
+          <button id="diffEasy" class="diff-btn" data-difficulty="easy">Easy</button>
+          <button id="diffMedium" class="diff-btn" data-difficulty="medium">Medium</button>
+          <button id="diffHard" class="diff-btn" data-difficulty="hard">Hard</button>
+          <button id="diffExpert" class="diff-btn" data-difficulty="expert">Expert</button>
+          <button id="diffUnreal" class="diff-btn" data-difficulty="unreal">Unreal</button>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="startBtn">Start</button>
+        <button id="infoBtn">How to play</button>
+      </div>
+      <div class="desc">Move: WASD / Arrow keys  Aim: Mouse  Auto-fire  Collect power-ups</div>
+    </div>
+  </div>
+
+  <div id="ui">
+    <div id="hud">
+      <div id="score">Score: 0</div>
+      <div id="health">Health: 10</div>
+      <div id="xp">XP: 0</div>
+      <div id="powerups"></div>
+      <div id="timer" style="font-size: 20px; font-weight: bold; color: #0f0; margin-bottom: 10px;">Time: 0s</div>
+      <div class="buttons">
+        <button id="pauseBtn">Pause</button>
+        <button id="restartBtn" style="display:none">Restart</button>
+        <button id="leaderboardBtn">Leaderboard</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="game"></canvas>
+
+  <div id="rewardModal" class="modal" style="display:none">
+    <div class="modal-content">
+      <h3>Choose a Reward</h3>
+      <div class="choices">
+        <button id="rewardHealth">+Health</button>
+        <button id="rewardDamage">+Damage</button>
+        <button id="rewardRate">Faster Fire</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="leaderboardModal" class="modal" style="display:none">
+    <div class="modal-content">
+      <h3>Leaderboard</h3>
+      <ol id="leaderboardModalList"></ol>
+      <button id="closeLeaderboard">Close</button>
+      <button id="clearLeaderboard">Clear</button>
+    </div>
+  </div>
+
+  <div id="testRunner" style="position:fixed; bottom:10px; right:10px; width:280px; max-height:300px; background:#222; color:#0f0; border:2px solid #0f0; padding:8px; font-family:monospace; font-size:11px; overflow-y:auto; z-index:999; display:none">
+    <div style="font-weight:bold; margin-bottom:6px">Test Runner</div>
+    <div id="testOutput"></div>
+    <button id="runTestBtn" style="margin-top:8px; width:100%; padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Run Tests</button>
+  </div>
+
+  <script src="game.js"></script>
+  <script>
+    // Test Runner
+    const testOutput = document.getElementById('testOutput');
+    const testRunner = document.getElementById('testRunner');
+    const runTestBtn = document.getElementById('runTestBtn');
+
+    function log(msg, type='info'){ const div = document.createElement('div'); div.style.color = type === 'pass'? '#0f0' : type === 'fail'? '#f00' : '#0f0'; div.textContent = msg; testOutput.appendChild(div); testOutput.scrollTop = testOutput.scrollHeight; }
+    function test(name, fn){ try{ fn(); log(`✓ ${name}`, 'pass'); } catch(e){ log(`✗ ${name}: ${e.message}`, 'fail'); } }
+
+    runTestBtn.addEventListener('click', ()=>{
+      testOutput.innerHTML = '';
+      log('Starting tests...', 'info');
+
+      // Test 1: Player exists
+      test('Player initialized', ()=>{ if(!window.player || !window.player.x) throw new Error('Player not found'); });
+
+      // Test 2: Game state exists
+      test('Game state exists', ()=>{ if(typeof window.running === 'undefined') throw new Error('Game state missing'); });
+
+      // Test 3: Reset game
+      test('Reset game', ()=>{ if(typeof window.resetGame !== 'function') throw new Error('resetGame not found'); window.resetGame(); if(window.score !== 0) throw new Error('Score not reset'); if(window.enemies.length !== 0) throw new Error('Enemies not cleared'); });
+
+      // Test 4: Spawn wave (must call resetGame first)
+      test('Spawn wave', ()=>{ 
+        window.resetGame(); // Reset game state before spawning wave
+        if(typeof window.startWave !== 'function') throw new Error('startWave not found'); 
+        if(!window.diffMod || !window.diffMod.spawnRate) throw new Error('Difficulty modifiers not set');
+        const beforeCount = window.enemies.length;
+        window.startWave(); 
+        const afterCount = window.enemies.length;
+        if(afterCount <= beforeCount) throw new Error(`Wave did not spawn enemies. Before: ${beforeCount}, After: ${afterCount}`); 
+      });
+
+      // Test 5: Fire projectile (must call resetGame first)
+      test('Fire projectile', ()=>{ 
+        window.resetGame(); // Reset game state before firing
+        window.player.fireTimer = -1; 
+        window.input.mouseX = window.player.x + 100; 
+        window.input.mouseY = window.player.y; 
+        if(typeof window.update !== 'function') throw new Error('update function not found');
+        window.update(0.016); 
+        if(window.projectiles.length === 0) throw new Error('No projectile fired: ' + window.projectiles.length); 
+      });
+
+      // Test 6: Collision (manual spawn)
+      test('Spawn gem', ()=>{ const gem = new window.Gem(window.player.x + 5, window.player.y + 5, 10); window.gems.push(gem); if(window.gems.length === 0) throw new Error('Gem not added'); });
+
+      // Test 7: Update simulation
+      test('Update simulation (10 frames)', ()=>{ for(let i=0; i<10; i++){ window.update(0.016); } log(`  Score: ${window.score}, Enemies: ${window.enemies.length}, Projectiles: ${window.projectiles.length}`, 'info'); });
+
+      // Test 8: Leaderboard functions
+      test('Leaderboard save/load', ()=>{ window.saveHighScore('TestPlayer', 500); const scores = window.getHighScores(); if(!scores.find(s=>s.name==='TestPlayer' && s.score===500)) throw new Error('Score not saved'); });
+
+      // Test 9: Reward modal
+      test('Reward modal exists', ()=>{ if(!document.getElementById('rewardModal')) throw new Error('Reward modal not found'); });
+
+      // Test 10: Draw function
+      test('Draw function callable', ()=>{ if(typeof window.draw !== 'function') throw new Error('Draw not found'); window.draw(); });
+
+      log('Tests complete!', 'pass');
+    });
+
+    // Show test runner on load after a delay
+    setTimeout(()=>{ testRunner.style.display = 'block'; }, 500);
+  </script>
+</body>
+</html>
