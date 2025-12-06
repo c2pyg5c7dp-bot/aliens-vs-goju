@@ -620,6 +620,98 @@ function spawnDamageNumber(x, y, damage) {
 
 // Input
 const input = { up: false, down: false, left: false, right: false, mouseX: W/2, mouseY: H/2, space: false };
+
+// Touch controls for mobile/iOS
+let touchJoystick = { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0, identifier: null };
+let touchShoot = { active: false, x: 0, y: 0, identifier: null };
+let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+// Prevent default touch behaviors on canvas
+canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchend', e => e.preventDefault(), { passive: false });
+
+// Touch start
+canvas.addEventListener('touchstart', e => {
+  const r = canvas.getBoundingClientRect();
+  
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const touch = e.changedTouches[i];
+    const x = touch.clientX - r.left;
+    const y = touch.clientY - r.top;
+    
+    // Left half = movement joystick
+    if (x < W / 2 && !touchJoystick.active) {
+      touchJoystick.active = true;
+      touchJoystick.startX = x;
+      touchJoystick.startY = y;
+      touchJoystick.currentX = x;
+      touchJoystick.currentY = y;
+      touchJoystick.identifier = touch.identifier;
+    }
+    // Right half = shoot/aim
+    else if (x >= W / 2 && !touchShoot.active) {
+      touchShoot.active = true;
+      touchShoot.x = x;
+      touchShoot.y = y;
+      touchShoot.identifier = touch.identifier;
+      input.mouseX = x;
+      input.mouseY = y;
+    }
+  }
+}, { passive: false });
+
+// Touch move
+canvas.addEventListener('touchmove', e => {
+  const r = canvas.getBoundingClientRect();
+  
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const touch = e.changedTouches[i];
+    const x = touch.clientX - r.left;
+    const y = touch.clientY - r.top;
+    
+    // Update joystick
+    if (touchJoystick.active && touch.identifier === touchJoystick.identifier) {
+      touchJoystick.currentX = x;
+      touchJoystick.currentY = y;
+      
+      const dx = x - touchJoystick.startX;
+      const dy = y - touchJoystick.startY;
+      const deadzone = 10;
+      
+      input.up = dy < -deadzone;
+      input.down = dy > deadzone;
+      input.left = dx < -deadzone;
+      input.right = dx > deadzone;
+    }
+    
+    // Update shoot position
+    if (touchShoot.active && touch.identifier === touchShoot.identifier) {
+      touchShoot.x = x;
+      touchShoot.y = y;
+      input.mouseX = x;
+      input.mouseY = y;
+    }
+  }
+}, { passive: false });
+
+// Touch end
+canvas.addEventListener('touchend', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const touch = e.changedTouches[i];
+    
+    if (touchJoystick.active && touch.identifier === touchJoystick.identifier) {
+      touchJoystick.active = false;
+      input.up = input.down = input.left = input.right = false;
+    }
+    
+    if (touchShoot.active && touch.identifier === touchShoot.identifier) {
+      touchShoot.active = false;
+    }
+  }
+}, { passive: false });
+
+// Keyboard controls
 window.addEventListener('keydown', e=>{
   if(e.key === 'w' || e.key === 'ArrowUp') input.up = true;
   if(e.key === 's' || e.key === 'ArrowDown') input.down = true;
@@ -2257,6 +2349,51 @@ function draw(){
     ctx.font = '20px Arial';
     ctx.fillStyle = '#aaa';
     ctx.fillText('Click anywhere or press ESC to return', W/2, H - 50);
+  }
+  
+  // Draw touch controls for mobile
+  if (isMobile && gameState === 'playing' && !paused) {
+    // Draw joystick on left side
+    if (touchJoystick.active) {
+      const baseRadius = 60;
+      const stickRadius = 30;
+      
+      // Joystick base
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.beginPath();
+      ctx.arc(touchJoystick.startX, touchJoystick.startY, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Joystick stick
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.beginPath();
+      ctx.arc(touchJoystick.currentX, touchJoystick.currentY, stickRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Connection line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(touchJoystick.startX, touchJoystick.startY);
+      ctx.lineTo(touchJoystick.currentX, touchJoystick.currentY);
+      ctx.stroke();
+    } else {
+      // Show hint for movement
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Touch left to move', W * 0.25, H - 40);
+    }
+    
+    // Show hint for shooting on right side
+    if (!touchShoot.active) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Touch right to aim', W * 0.75, H - 40);
+    }
+    
+    ctx.textAlign = 'center'; // Reset
   }
 }
 
