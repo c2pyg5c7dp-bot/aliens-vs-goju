@@ -100,15 +100,25 @@ function startWave(){ wave++; const baseCount = 5 + Math.floor(wave * 1.6); cons
 
 function resetGame(){ player = new Player(); player.damage *= (diffMod.playerDamage || 1); player.fireRate *= (diffMod.fireRate || 1); enemies = []; projectiles = []; powerups = []; particles = []; gems = []; score = 0; nextRewardAt = 500; rewardTriggered = false; wave = 0; spawnTimer = 0; gameTime = 0; running = true; paused = false; window.player = player; window.enemies = enemies; window.projectiles = projectiles; window.powerups = powerups; window.particles = particles; window.gems = gems; window.score = score; window.running = running; }
 
-rewardHealth.addEventListener('click', ()=>{ player.maxHealth += 3; player.health = Math.min(player.maxHealth, player.health + 3); rewardModal.style.display = 'none'; paused = false; rewardTriggered = false; nextRewardAt += 500; });
-rewardDamage.addEventListener('click', ()=>{ player.damage += 0.5; rewardModal.style.display = 'none'; paused = false; rewardTriggered = false; nextRewardAt += 500; });
-rewardRate.addEventListener('click', ()=>{ player.fireRate = Math.max(0.02, player.fireRate * 0.88); rewardModal.style.display = 'none'; paused = false; rewardTriggered = false; nextRewardAt += 500; });
-startBtn.addEventListener('click', ()=>{ startScreen.style.display = 'none'; resetGame(); renderLeaderboard(leaderboardList); requestAnimationFrame(loop); });
-pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
-restartBtn.addEventListener('click', ()=>{ resetGame(); });
-leaderboardBtn.addEventListener('click', ()=>{ renderLeaderboard(leaderboardModalList); leaderboardModal.style.display = 'block'; });
-closeLeaderboard.addEventListener('click', ()=>{ leaderboardModal.style.display = 'none'; });
-clearLeaderboard.addEventListener('click', ()=>{ localStorage.removeItem(HB_KEY); renderLeaderboard(leaderboardModalList); renderLeaderboard(leaderboardList); });
+// Event listeners with null checks
+if(rewardHealth) rewardHealth.addEventListener('click', ()=>{ player.maxHealth += 3; player.health = Math.min(player.maxHealth, player.health + 3); rewardModal.style.display = 'none'; paused = false; rewardTriggered = false; nextRewardAt += 500; });
+if(rewardDamage) rewardDamage.addEventListener('click', ()=>{ player.damage += 0.5; rewardModal.style.display = 'none'; paused = false; rewardTriggered = false; nextRewardAt += 500; });
+if(rewardRate) rewardRate.addEventListener('click', ()=>{ player.fireRate = Math.max(0.02, player.fireRate * 0.88); rewardModal.style.display = 'none'; paused = false; rewardTriggered = false; nextRewardAt += 500; });
+if(startBtn) startBtn.addEventListener('click', ()=>{ if(startScreen) startScreen.style.display = 'none'; resetGame(); renderLeaderboard(leaderboardList); requestAnimationFrame(loop); });
+if(pauseBtn) pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
+if(restartBtn) restartBtn.addEventListener('click', ()=>{ resetGame(); });
+if(leaderboardBtn) leaderboardBtn.addEventListener('click', ()=>{ renderLeaderboard(document.getElementById('leaderboardList')); if(leaderboardModal) leaderboardModal.style.display = 'flex'; });
+
+// Handle close leaderboard buttons
+const closeLeaderboardBtn = document.getElementById('closeLeaderboardBtn');
+const closeLeaderboardBtn2 = document.getElementById('closeLeaderboardBtn2');
+if(closeLeaderboardBtn) closeLeaderboardBtn.addEventListener('click', ()=>{ if(leaderboardModal) leaderboardModal.style.display = 'none'; });
+if(closeLeaderboardBtn2) closeLeaderboardBtn2.addEventListener('click', ()=>{ if(leaderboardModal) leaderboardModal.style.display = 'none'; });
+
+// Clear scores button
+const clearScoresBtn = document.getElementById('clearScoresBtn');
+if(clearScoresBtn) clearScoresBtn.addEventListener('click', ()=>{ localStorage.removeItem(HB_KEY); renderLeaderboard(document.getElementById('leaderboardList')); });
+
 document.querySelectorAll('.diff-btn').forEach(btn => { btn.addEventListener('click', (e)=>{ document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('selected')); e.target.classList.add('selected'); currentDifficulty = e.target.dataset.difficulty; diffMod = difficultyModifiers[currentDifficulty]; }); });
 if(document.getElementById('diffMedium')) document.getElementById('diffMedium').classList.add('selected');
 

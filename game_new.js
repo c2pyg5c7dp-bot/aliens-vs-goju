@@ -1,4 +1,4 @@
-// Vampire Survivors — Lite (simplified and clean)
+// Aliens vs Goju — A survival game
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -46,6 +46,19 @@ let enemyProjectiles = []; // Red alien rock projectiles
 let damageNumbers = []; // Floating damage numbers
 let lastTime = 0;
 let selectedCharacter = 'player'; // Default character
+
+// Multiplayer player tracking
+let multiplayerPlayers = []; // Array of {id, name, score, character}
+function updateMultiplayerScore(playerId, playerName, playerScore, playerCharacter) {
+  const existing = multiplayerPlayers.find(p => p.id === playerId);
+  if (existing) {
+    existing.score = playerScore;
+    existing.name = playerName;
+    existing.character = playerCharacter;
+  } else {
+    multiplayerPlayers.push({ id: playerId, name: playerName, score: playerScore, character: playerCharacter });
+  }
+}
 
 // Character definitions
 const CHARACTERS = {
@@ -361,7 +374,7 @@ class Projectile {
   constructor(x, y, vx, vy, type, damage){
     this.x = x; this.y = y; this.vx = vx; this.vy = vy;
     this.type = type; this.damage = damage;
-    this.radius = type === 'rocket' ? 5 : type === 'fireball' ? 5 : 2;
+    this.radius = type === 'rocket' ? 7.5 : type === 'fireball' ? 7.5 : 3;
     this.life = 4; this.explosion = type === 'rocket' ? 90 : 0;
   }
 }
@@ -370,7 +383,7 @@ class EnemyProjectile {
   constructor(x, y, vx, vy, damage){
     this.x = x; this.y = y; this.vx = vx; this.vy = vy;
     this.damage = damage;
-    this.radius = 6;
+    this.radius = 9;
     this.life = 5; // Time before disappearing
   }
 }
@@ -928,7 +941,25 @@ function startGame(){
 
 startBtn.addEventListener('click', startGameFromUI);
 pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
-restartBtn.addEventListener('click', ()=>{ startGameFromUI(); });
+restartBtn.addEventListener('click', ()=>{ 
+  // Stop the game
+  running = false;
+  paused = false;
+  if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  
+  // Hide game UI
+  const hud = document.getElementById('hud');
+  if(hud) hud.style.display = 'none';
+  if(pauseBtn) pauseBtn.style.display = 'none';
+  if(restartBtn) restartBtn.style.display = 'none';
+  
+  // Show start screen (main menu)
+  const startScreen = document.getElementById('startScreen');
+  if(startScreen) startScreen.style.display = 'flex';
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
 if(leaderboardBtn) leaderboardBtn.addEventListener('click', ()=>{ if(leaderboardModalList) renderLeaderboard(leaderboardModalList); if(leaderboardModal) leaderboardModal.style.display = 'block'; });
 if(closeLeaderboard) closeLeaderboard.addEventListener('click', ()=>{ if(leaderboardModal) leaderboardModal.style.display = 'none'; });
 if(clearLeaderboard) clearLeaderboard.addEventListener('click', ()=>{ localStorage.removeItem(HB_KEY); if(leaderboardModalList) renderLeaderboard(leaderboardModalList); if(leaderboardList) renderLeaderboard(leaderboardList); });
@@ -1038,6 +1069,16 @@ function loop(ts){
 function update(dt){
   // Update game timer
   gameTime += dt;
+  
+  // Broadcast score in co-op mode every second
+  if (window.isCoopMode) {
+    if (!window.scoreBroadcastTimer) window.scoreBroadcastTimer = 0;
+    window.scoreBroadcastTimer += dt;
+    if (window.scoreBroadcastTimer >= 1.0) {
+      window.scoreBroadcastTimer = 0;
+      if (window.broadcastScore) window.broadcastScore();
+    }
+  }
   
   // Process spawn queue - spawn enemies gradually over time
   if(spawnQueue.length > 0){
@@ -1805,7 +1846,7 @@ function draw(){
       // Draw rocket projectile as orange circle (not the sprite)
       ctx.fillStyle = '#fa4';
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
+      ctx.arc(p.x, p.y, 7.5, 0, Math.PI*2);
       ctx.fill();
       // Draw explosion radius indicator
       ctx.strokeStyle = 'rgba(255,160,64,0.12)';
@@ -1814,7 +1855,7 @@ function draw(){
       ctx.stroke();
     } else if(p.type === 'fireball' && fireballImageLoaded){
       // Draw fireball sprite
-      const size = 28; // Size of fireball sprite
+      const size = 42; // Size of fireball sprite (50% bigger)
       ctx.drawImage(fireballImage, p.x - size/2, p.y - size/2, size, size);
       // Draw fireball glow
       ctx.fillStyle = 'rgba(255, 102, 0, 0.3)';
@@ -2050,6 +2091,60 @@ function draw(){
     }
   }
 
+  // Draw multiplayer scoreboard in co-op mode
+  if (window.isCoopMode && multiplayerPlayers.length > 0) {
+    const sbX = W - 250; // Top right corner
+    const sbY = 15;
+    const sbWidth = 230;
+    const lineHeight = 35;
+    const sbHeight = 20 + (multiplayerPlayers.length + 1) * lineHeight; // +1 for local player
+    
+    // Semi-transparent background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(sbX, sbY, sbWidth, sbHeight);
+    
+    // Border
+    ctx.strokeStyle = '#4da6ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sbX, sbY, sbWidth, sbHeight);
+    
+    // Title
+    ctx.fillStyle = '#ffff00';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('CO-OP SCOREBOARD', sbX + 10, sbY + 20);
+    
+    // Local player (you)
+    ctx.fillStyle = '#00ff88';
+    ctx.font = 'bold 14px Arial';
+    const localName = window.discordAuth?.user?.username || 'You';
+    ctx.fillText(`${localName} (You)`, sbX + 10, sbY + 20 + lineHeight);
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${score}`, sbX + sbWidth - 10, sbY + 20 + lineHeight);
+    
+    // Other players
+    multiplayerPlayers.sort((a, b) => b.score - a.score); // Sort by score descending
+    multiplayerPlayers.forEach((player, idx) => {
+      const yPos = sbY + 20 + (idx + 2) * lineHeight;
+      
+      // Player name
+      ctx.fillStyle = '#4da6ff';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'left';
+      const displayName = player.name.length > 15 ? player.name.substring(0, 15) + '...' : player.name;
+      ctx.fillText(displayName, sbX + 10, yPos);
+      
+      // Player score
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${player.score}`, sbX + sbWidth - 10, yPos);
+    });
+    
+    // Reset text alignment
+    ctx.textAlign = 'center';
+  }
+
   // Draw custom animations (on top of game entities)
   try{ if(window.animLoader) window.animLoader.draw(ctx); } catch(e) { console.error('animLoader.draw error', e); }
   
@@ -2110,8 +2205,8 @@ function draw(){
     ctx.textAlign = 'center';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 6;
-    ctx.strokeText('VAMPIRE SURVIVORS', W/2, H/2 - 250);
-    ctx.fillText('VAMPIRE SURVIVORS', W/2, H/2 - 250);
+    ctx.strokeText('ALIENS VS GOJU', W/2, H/2 - 250);
+    ctx.fillText('ALIENS VS GOJU', W/2, H/2 - 250);
   }
   
   // Draw leaderboard screen
@@ -2409,6 +2504,24 @@ setTimeout(()=>{
     }
   }catch(e){}
 }, 900);
+
+// Expose multiplayer functions globally
+window.updateMultiplayerScore = updateMultiplayerScore;
+window.getLocalScore = () => score;
+window.getLocalPlayerInfo = () => ({
+  score: score,
+  character: selectedCharacter,
+  name: window.discordAuth?.user?.username || 'Player'
+});
+
+// Broadcast score updates in co-op mode (call this periodically)
+window.broadcastScore = function() {
+  if (window.isCoopMode && window.discordSdk) {
+    // This would integrate with your Discord SDK or networking layer
+    // For now, it's a placeholder that can be called from main.js
+    console.log('Broadcasting score:', score);
+  }
+};
 
 // Start game loop in menu mode
 setTimeout(() => {

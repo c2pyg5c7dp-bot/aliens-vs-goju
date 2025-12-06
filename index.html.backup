@@ -3,56 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Aliens vs Goju</title>
+  <title>Vampire Survivors  Lite</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a2e; display: flex; align-items: center; justify-content: center; z-index: 10000;">
-    <div style="text-align: center; color: #fff;">
-      <h2>Connecting to Discord...</h2>
-      <p>Please wait</p>
-      <p style="font-size: 12px; opacity: 0.5; margin-top: 20px;">If stuck, check browser console (F12)</p>
-    </div>
-  </div>
-
-  <script>
-    // Safety timeout - hide loading screen after 10 seconds no matter what
-    setTimeout(() => {
-      const loadingScreen = document.getElementById('loading-screen');
-      if (loadingScreen && loadingScreen.style.display !== 'none') {
-        console.warn('Force-hiding loading screen after timeout');
-        loadingScreen.style.display = 'none';
-      }
-    }, 10000);
-  </script>
-
   <div id="startScreen" class="overlay">
     <div class="panel">
-      <h1>Aliens vs Goju</h1>
+      <h1>Vampire Survivors Lite</h1>
       <div id="leaderboardStart" class="leaderboard">
         <h3>Leaderboard</h3>
         <ol id="leaderboardList"></ol>
       </div>
       <div class="controls">
-        <button id="startBtn">Start Solo</button>
-        <button id="coopBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin-top: 12px;">Start Co-op</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="lobbyScreen" class="overlay" style="display:none">
-    <div class="panel">
-      <h1>Co-op Lobby</h1>
-      <div style="text-align: center; color: var(--fg);">
-        <p id="lobbyStatus">Waiting for players...</p>
-        <div id="playersList" style="margin: 20px 0; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-          <h3>Players in Lobby:</h3>
-          <div id="playersListContent">
-            <p>Loading...</p>
-          </div>
-        </div>
-        <button id="startCoopBtn" style="background: #4CAF50; padding: 12px 24px; font-size: 16px;">Start Co-op Game</button>
-        <button id="leaveLobbyBtn" style="background: #f44336; margin-left: 12px;">Leave Lobby</button>
+        <button id="startBtn">Start Game</button>
       </div>
     </div>
   </div>
@@ -61,7 +24,7 @@
     <div class="panel">
       <h1>Select Your Character</h1>
       <div class="character-grid">
-        <div class="character-card" data-character="player">
+        <div class="character-card" onclick="startGameWithCharacter('player')">
           <h3>Player</h3>
           <p class="char-desc">Balanced stats</p>
           <div class="char-stats">
@@ -71,7 +34,7 @@
             <div>Fire Rate: 0.12</div>
           </div>
         </div>
-        <div class="character-card" data-character="tank">
+        <div class="character-card" onclick="startGameWithCharacter('tank')">
           <h3>Tank</h3>
           <p class="char-desc">High health, slow but powerful</p>
           <div class="char-stats">
@@ -81,7 +44,7 @@
             <div>Fire Rate: 0.18</div>
           </div>
         </div>
-        <div class="character-card" data-character="speedster">
+        <div class="character-card" onclick="startGameWithCharacter('speedster')">
           <h3>Speedster</h3>
           <p class="char-desc">Fast and agile with better pickup</p>
           <div class="char-stats">
@@ -91,7 +54,7 @@
             <div>Fire Rate: 0.08</div>
           </div>
         </div>
-        <div class="character-card" data-character="glass_cannon">
+        <div class="character-card" onclick="startGameWithCharacter('glass_cannon')">
           <h3>Glass Cannon</h3>
           <p class="char-desc">High damage but very fragile</p>
           <div class="char-stats">
@@ -393,7 +356,7 @@
     </div>
   </div>
 
-  <script type="module" src="./main.js"></script>
+  <script src="game_new.js"></script>
   <script src="animations/player-animations.js"></script>
   <script src="animations/enemy-animations.js"></script>
   <script src="animations/golem-animations.js"></script>
