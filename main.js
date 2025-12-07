@@ -16,32 +16,55 @@ console.log('Query params:', window.location.search);
 
 // Load game immediately, don't wait for Discord SDK
 function loadGameNow() {
-  console.log('Loading game immediately...');
+  console.log('🎮 loadGameNow() called');
   const loadingStatus = document.getElementById('loading-status');
-  if (loadingStatus) loadingStatus.textContent = 'Game ready!';
-  
   const loadingScreen = document.getElementById('loading-screen');
+  
+  console.log('Loading status element:', loadingStatus ? 'FOUND' : 'NOT FOUND');
+  console.log('Loading screen element:', loadingScreen ? 'FOUND' : 'NOT FOUND');
+  
+  if (loadingStatus) {
+    loadingStatus.textContent = 'Game ready!';
+    console.log('✅ Updated loading status');
+  }
+  
   if (loadingScreen) {
+    console.log('🎬 Hiding loading screen...');
     loadingScreen.style.display = 'none';
+    console.log('✅ Loading screen hidden');
+  } else {
+    console.error('❌ Cannot hide loading screen - element not found!');
   }
   
   // Game script is already loaded via HTML, just initialize co-op UI
-  setTimeout(() => initializeCoopUI(), 500);
+  setTimeout(() => {
+    console.log('🔧 Initializing co-op UI...');
+    initializeCoopUI();
+  }, 500);
 }
 
 async function init() {
-  console.log('Init function started');
+  console.log('🚀 Init function started');
+  console.log('⏰ Timestamp:', new Date().toISOString());
   const loadingScreen = document.getElementById('loading-screen');
+  console.log('Loading screen found in init:', !!loadingScreen);
   
   // FAILSAFE: Always remove loading screen after 3 seconds max
   setTimeout(() => {
+    console.log('⏱️ Failsafe timeout triggered (3 seconds)');
     console.log('Failsafe: Force removing loading screen');
-    if (loadingScreen) {
-      loadingScreen.style.display = 'none';
+    const ls = document.getElementById('loading-screen');
+    if (ls) {
+      console.log('Failsafe: Loading screen element found, hiding it');
+      ls.style.display = 'none';
+      console.log('✅ Failsafe: Loading screen hidden');
+    } else {
+      console.error('❌ Failsafe: Loading screen element not found!');
     }
   }, 3000);
   
   // Start loading game immediately
+  console.log('⏱️ Scheduling loadGameNow in 500ms...');
   setTimeout(loadGameNow, 500);
   
   // Initialize Discord SDK in parallel (non-blocking)
