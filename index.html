@@ -500,6 +500,13 @@
   <script>
     console.log('🎮 Lobby script loading...');
     
+    // Create visible debug indicator
+    const debugDiv = document.createElement('div');
+    debugDiv.id = 'lobbyDebug';
+    debugDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; background: lime; color: black; padding: 10px; z-index: 999999; font-size: 12px; border-radius: 5px; max-width: 300px;';
+    debugDiv.innerHTML = 'Lobby script loaded ✅';
+    document.body.appendChild(debugDiv);
+    
     // Lobby state
     const lobbyState = {
       code: null,
@@ -580,23 +587,30 @@
       
       // Co-op button
       const coopBtn = document.getElementById('coopBtn');
+      const debugDiv = document.getElementById('lobbyDebug');
       if (coopBtn) {
+        if (debugDiv) debugDiv.innerHTML += '<br>Co-op button found ✅';
         coopBtn.addEventListener('click', () => {
           console.log('Co-op clicked!');
+          if (debugDiv) debugDiv.innerHTML += '<br>Co-op clicked! 🎮';
           
           // Generate lobby code
           lobbyState.code = generateLobbyCode();
           const lobbyCodeDisplay = document.getElementById('lobbyCodeDisplay');
           if (lobbyCodeDisplay) lobbyCodeDisplay.value = lobbyState.code;
+          if (debugDiv) debugDiv.innerHTML += '<br>Code: ' + lobbyState.code;
           
           // Show lobby
           const startScreen = document.getElementById('startScreen');
           const lobbyScreen = document.getElementById('lobbyScreen');
           if (startScreen) startScreen.style.display = 'none';
           if (lobbyScreen) lobbyScreen.style.display = 'flex';
+          if (debugDiv) debugDiv.innerHTML += '<br>Lobby shown ✅';
           
           updateLobbyDisplay();
         });
+      } else {
+        if (debugDiv) debugDiv.innerHTML += '<br>❌ Co-op button NOT found!';
       }
       
       // Copy button
