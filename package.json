@@ -1,6 +1,6 @@
 {
   "name": "aliens-vs-goju-discord",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Vampire Survivors-style game as a Discord Activity",
   "main": "index.html",
   "scripts": {
