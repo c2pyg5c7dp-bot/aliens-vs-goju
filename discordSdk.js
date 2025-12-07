@@ -5,9 +5,18 @@ let discordSdk;
 let auth;
 
 export async function setupDiscordSdk() {
+  console.log('🎮 Setting up Discord SDK...');
+  console.log('Current URL:', window.location.href);
+  console.log('URL params:', window.location.search);
+  console.log('User agent:', navigator.userAgent);
+  
   // Check if we're running in Discord (has frame_id parameter)
   const urlParams = new URLSearchParams(window.location.search);
   const isInDiscord = urlParams.has('frame_id') || window.parent !== window;
+  
+  console.log('Is in Discord?', isInDiscord);
+  console.log('Has frame_id?', urlParams.has('frame_id'));
+  console.log('Is framed?', window.parent !== window);
   
   // Check if on iOS
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
