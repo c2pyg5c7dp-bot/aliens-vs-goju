@@ -503,9 +503,25 @@
     // Create visible debug indicator
     const debugDiv = document.createElement('div');
     debugDiv.id = 'lobbyDebug';
-    debugDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; background: lime; color: black; padding: 10px; z-index: 999999; font-size: 12px; border-radius: 5px; max-width: 300px;';
-    debugDiv.innerHTML = 'Lobby script loaded ✅';
-    document.body.appendChild(debugDiv);
+    debugDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; background: lime; color: black; padding: 10px; z-index: 999999; font-size: 11px; border-radius: 5px; max-width: 350px; max-height: 400px; overflow-y: auto;';
+    debugDiv.innerHTML = 'Lobby script loaded ✅<br>DOM ready: ' + document.readyState;
+    
+    // Wait for body to exist before appending
+    if (document.body) {
+      document.body.appendChild(debugDiv);
+    } else {
+      window.addEventListener('DOMContentLoaded', () => {
+        if (!document.getElementById('lobbyDebug')) {
+          document.body.appendChild(debugDiv);
+        }
+      });
+    }
+    
+    // Log script loads
+    window.addEventListener('load', () => {
+      if (debugDiv) debugDiv.innerHTML += '<br>Window loaded ✅';
+      if (debugDiv) debugDiv.innerHTML += '<br>game.v2.js: ' + (typeof window.startGameWithCharacter !== 'undefined' ? '✅' : '❌ NOT LOADED');
+    });
     
     // Lobby state
     const lobbyState = {
