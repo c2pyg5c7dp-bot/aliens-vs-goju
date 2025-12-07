@@ -83,16 +83,15 @@ export function getCurrentUser() {
 }
 
 // Get participant info (who's in the Activity)
+// Note: This requires proper OAuth2 authentication with guilds.members.read scope
+// For now, return empty array to avoid authentication errors
 export async function getParticipants() {
   if (!discordSdk) return [];
   
-  try {
-    const participants = await discordSdk.commands.getInstanceConnectedParticipants();
-    return participants.participants;
-  } catch (error) {
-    console.error("Failed to get participants:", error);
-    return [];
-  }
+  // Participants API requires authentication - disabled for now
+  // To enable, you need to implement OAuth2 with proper scopes
+  console.log("Participants API disabled - requires OAuth2 authentication");
+  return [];
 }
 
 // Send an activity update (e.g., score)

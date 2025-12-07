@@ -87,35 +87,24 @@ function setupCoopButton(discordSdk, auth) {
         if (startScreen) startScreen.style.display = 'none';
         if (lobbyScreen) lobbyScreen.style.display = 'flex';
         
-        // Get and display participants
+        // Display static lobby info (no participant polling)
         updateParticipantsList(discordSdk);
-        
-        // Poll for participants every 2 seconds
-        const participantPoll = setInterval(async () => {
-          if (lobbyScreen.style.display === 'none') {
-            clearInterval(participantPoll);
-            return;
-          }
-          await updateParticipantsList(discordSdk);
-        }, 2000);
       });
     }
   }, 100);
 }
 
 async function updateParticipantsList(discordSdk) {
-  const participants = await getParticipants();
   const playersListContent = document.getElementById('playersListContent');
+  const lobbyStatus = document.getElementById('lobbyStatus');
   
-  if (playersListContent && participants) {
-    playersListContent.innerHTML = participants.length > 0
-      ? participants.map(p => `<p>👤 ${p.username || 'Player'}</p>`).join('')
-      : '<p>Waiting for players...</p>';
-    
-    const lobbyStatus = document.getElementById('lobbyStatus');
-    if (lobbyStatus) {
-      lobbyStatus.textContent = `${participants.length} player${participants.length !== 1 ? 's' : ''} in lobby`;
-    }
+  if (playersListContent) {
+    // Show static message since we can't get participants without OAuth2
+    playersListContent.innerHTML = '<p>👤 You</p><p style="font-size: 12px; opacity: 0.7;">Share this Activity with friends to play together!</p>';
+  }
+  
+  if (lobbyStatus) {
+    lobbyStatus.textContent = 'Ready to play';
   }
 }
 
