@@ -179,12 +179,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const startCoopBtn = document.getElementById('startCoopBtn');
   if (startCoopBtn) {
     startCoopBtn.addEventListener('click', () => {
-      if (!lobbyState.myCharacter) {
-        alert('Please select a character first!');
-        return;
+    if (!lobbyState.myCharacter) {
+      console.warn('Please select a character first!');
+      window.debugLog?.('⚠️ Please select a character first!');
+      // Flash the character selection section
+      const charSection = document.querySelector('.lobby-char-card')?.parentElement?.parentElement;
+      if (charSection) {
+        charSection.style.animation = 'shake 0.3s';
+        setTimeout(() => charSection.style.animation = '', 300);
       }
-      
-      console.log('Starting game with:', lobbyState.myCharacter);
+      return;
+    }      console.log('Starting game with:', lobbyState.myCharacter);
       
       // Hide lobby
       const lobbyScreen = document.getElementById('lobbyScreen');

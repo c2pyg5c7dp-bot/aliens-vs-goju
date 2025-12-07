@@ -12,13 +12,15 @@ const canvas = document.getElementById('game');
 if (!canvas) {
   console.error('CRITICAL: Canvas element not found!');
   console.error('Available elements with id:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
-  alert('Game canvas not found. The page may not have loaded correctly. Please refresh.');
-  throw new Error('Canvas element with id="game" not found');
+  console.error('Game canvas not found. The page may not have loaded correctly.');
+  // Don't throw - let debug display show the error
+  window.debugLog?.('❌ FATAL: Canvas element not found!');
 }
-const ctx = canvas.getContext('2d');
+const ctx = canvas?.getContext('2d');
 if (!ctx) {
   console.error('CRITICAL: Cannot get 2D context!');
-  throw new Error('Cannot get 2D rendering context');
+  window.debugLog?.('❌ FATAL: Cannot get 2D rendering context');
+  // Return early if no context
 }
 console.log('Canvas initialized successfully', { width: canvas.width, height: canvas.height });
 if (loadingGame) loadingGame.textContent = '✅ Game Engine';
@@ -69,7 +71,7 @@ console.log('UI Elements found:', {
 
 if (!startBtn) {
   console.error('CRITICAL: Start button not found!');
-  alert('Start button not found - game cannot start');
+  window.debugLog?.('❌ Start button not found - game cannot start');
 }
 
 const leaderboardBtn = document.getElementById('leaderboardBtn');
