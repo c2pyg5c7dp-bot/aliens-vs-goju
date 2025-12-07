@@ -6,14 +6,31 @@ let DPR = window.devicePixelRatio || 1;
 
 function resizeCanvas(){
   DPR = window.devicePixelRatio || 1;
-  canvas.style.width = window.innerWidth + 'px';
-  canvas.style.height = window.innerHeight + 'px';
-  canvas.width = Math.floor(window.innerWidth * DPR);
-  canvas.height = Math.floor(window.innerHeight * DPR);
+  
+  // Use visualViewport for better mobile support (especially iOS)
+  let width = window.innerWidth;
+  let height = window.innerHeight;
+  
+  if (window.visualViewport) {
+    width = window.visualViewport.width;
+    height = window.visualViewport.height;
+  }
+  
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  canvas.width = Math.floor(width * DPR);
+  canvas.height = Math.floor(height * DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  
+  // Update game dimensions
+  W = width;
+  H = height;
 }
 
 window.addEventListener('resize', resizeCanvas);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', resizeCanvas);
+}
 resizeCanvas();
 
 // UI Elements
