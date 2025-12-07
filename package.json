@@ -1,11 +1,11 @@
 {
   "name": "aliens-vs-goju-discord",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Vampire Survivors-style game as a Discord Activity",
   "main": "index.html",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build --force",
+    "build": "vite build --force --emptyOutDir",
     "preview": "vite preview"
   },
   "keywords": ["discord", "activity", "game"],

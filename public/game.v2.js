@@ -1,5 +1,7 @@
 // Aliens vs Goju — A survival game
+// Build version: 2024-12-07-v2
 console.log('🎮 game.v2.js loading...');
+console.log('Build: 2024-12-07-v2');
 console.log('Document ready state:', document.readyState);
 console.log('DOM elements:', {
   canvas: document.getElementById('game'),
