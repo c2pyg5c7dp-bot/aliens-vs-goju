@@ -2,14 +2,71 @@
 console.log('🎮 main.js loading...');
 if (window.debugLog) window.debugLog('🎮 main.js loading...');
 
-import { setupDiscordSdk, getCurrentUser, getParticipants } from './discordSdk.js';
-console.log('✅ discordSdk.js imported successfully');
-if (window.debugLog) window.debugLog('✅ Discord SDK imported');
+// Discord SDK will be loaded via CDN in index.html
+console.log('✅ main.js loaded');
+if (window.debugLog) window.debugLog('✅ Main script loaded');
 
 // Store Discord SDK globally for game access
 window.discordSdk = null;
 window.discordAuth = null;
 window.isCoopMode = false;
+
+// Discord SDK setup function
+async function setupDiscordSdk() {
+  try {
+    if (!window.DiscordSDK) {
+      console.log('Discord SDK not available - running standalone');
+      return { discordSdk: null, auth: null };
+    }
+    
+    const discordSdk = new window.DiscordSDK('1446725465300664402');
+    await discordSdk.ready();
+    
+    const { code } = await discordSdk.commands.authorize({
+      client_id: '1446725465300664402',
+      response_type: 'code',
+      state: '',
+      prompt: 'none',
+      scope: ['identify', 'guilds']
+    });
+    
+    const response = await fetch('/.proxy/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    
+    const { access_token } = await response.json();
+    const auth = await discordSdk.commands.authenticate({ access_token });
+    
+    return { discordSdk, auth };
+  } catch (error) {
+    console.error('Discord SDK setup failed:', error);
+    return { discordSdk: null, auth: null };
+  }
+}
+
+async function getCurrentUser(discordSdk) {
+  if (!discordSdk) return null;
+  try {
+    const user = await discordSdk.commands.getUser();
+    return user;
+  } catch (error) {
+    console.error('Failed to get current user:', error);
+    return null;
+  }
+}
+
+async function getParticipants(discordSdk) {
+  if (!discordSdk) return [];
+  try {
+    const participants = await discordSdk.commands.getInstanceConnectedParticipants();
+    return participants || [];
+  } catch (error) {
+    console.error('Failed to get participants:', error);
+    return [];
+  }
+}
 
 // Add debugging
 console.log('Main.js loaded');
