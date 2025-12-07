@@ -14,6 +14,9 @@ console.log('Query params:', window.location.search);
 // Load game immediately, don't wait for Discord SDK
 function loadGameNow() {
   console.log('Loading game immediately...');
+  const loadingStatus = document.getElementById('loading-status');
+  if (loadingStatus) loadingStatus.textContent = 'Game ready!';
+  
   const loadingScreen = document.getElementById('loading-screen');
   if (loadingScreen) {
     loadingScreen.style.display = 'none';
@@ -41,9 +44,13 @@ async function init() {
   // Initialize Discord SDK in parallel (non-blocking)
   try {
     console.log('Setting up Discord SDK in background...');
+    const loadingDiscord = document.getElementById('loading-discord');
+    if (loadingDiscord) loadingDiscord.textContent = '⏳ Discord SDK';
+    
     const { discordSdk, auth } = await setupDiscordSdk();
     
     console.log('Discord SDK setup complete', { discordSdk: !!discordSdk, auth: !!auth });
+    if (loadingDiscord) loadingDiscord.textContent = discordSdk ? '✅ Discord SDK' : '⚠️ Standalone Mode';
     
     if (discordSdk) {
       console.log('Discord SDK initialized!');

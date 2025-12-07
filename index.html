@@ -23,9 +23,14 @@
 <body>
   <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a2e; display: flex; align-items: center; justify-content: center; z-index: 10000;">
     <div style="text-align: center; color: #fff;">
-      <h2>Connecting to Discord...</h2>
-      <p>Please wait</p>
-      <p style="font-size: 12px; opacity: 0.5; margin-top: 20px;">If stuck, check browser console (F12)</p>
+      <h2>Loading Game...</h2>
+      <p id="loading-status">Initializing Discord SDK...</p>
+      <div id="loading-details" style="font-size: 10px; opacity: 0.5; margin-top: 20px;">
+        <div id="loading-discord">❓ Discord SDK</div>
+        <div id="loading-game">❓ Game Engine</div>
+        <div id="loading-animations">❓ Animations</div>
+      </div>
+      <p style="font-size: 12px; opacity: 0.5; margin-top: 20px;">Press F12 to view console if stuck</p>
     </div>
   </div>
 
@@ -412,7 +417,10 @@
     </div>
   </div>
 
+  <!-- Discord SDK and main initialization -->
   <script type="module" src="./main.js"></script>
+  
+  <!-- Game scripts loaded with defer to ensure DOM is ready -->
   <script defer src="/game.v2.js"></script>
   <script defer src="/animations/player-animations.js"></script>
   <script defer src="/animations/enemy-animations.js"></script>
