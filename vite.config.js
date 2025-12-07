@@ -35,6 +35,9 @@ export default defineConfig({
       input: {
         main: './index.html'
       }
-    }
-  }
+    },
+    // Copy game scripts as static assets instead of bundling
+    copyPublicDir: true
+  },
+  publicDir: 'public'
 });
