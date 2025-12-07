@@ -3,6 +3,7 @@
 
 (function(){
   'use strict';
+  console.log('📦 Loading player-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -28,7 +29,7 @@
 
   // Player animation state manager
   class PlayerAnimationController {
-    constructor(basePath = 'animations/Player'){
+    constructor(basePath = '/animations/Player'){
       this.basePath = basePath;
       this.sprites = {}; // spriteKey -> { frames: [Image], frameW, frameH, loaded }
       this.currentAnim = null;
@@ -166,7 +167,9 @@
 
   // Create global instance
   window.playerAnimController = new PlayerAnimationController();
+  console.log('✅ Player animation controller created');
 
-  // Don't auto-load - let the game decide when to load animations
-  console.info('Player animation controller ready (not auto-loading)');
+  // Auto-load animations
+  window.playerAnimController.loadAll();
+  console.info('Player animations loading...');
 })();

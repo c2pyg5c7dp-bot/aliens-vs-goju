@@ -3,6 +3,7 @@
 
 (function(){
   'use strict';
+  console.log('📦 Loading enemy-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -28,7 +29,7 @@
 
   // Enemy animation state manager
   class EnemyAnimationController {
-    constructor(basePath = 'animations/enemies'){
+    constructor(basePath = '/animations/enemies'){
       this.basePath = basePath;
       this.sprites = {}; // animType_direction -> { frames: [Image], frameW, frameH, loaded }
       this.enabled = false; // disabled until sprites load
@@ -155,6 +156,6 @@
 
   // Create global instance
   window.enemyAnimController = new EnemyAnimationController();
-
-  console.info('Enemy animation controller ready');
+  window.enemyAnimController.loadAll();
+  console.info('Enemy animation controller ready and loading...');
 })();

@@ -3,6 +3,7 @@
 
 (function(){
   'use strict';
+  console.log('📦 Loading redalien-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -28,7 +29,7 @@
 
   // Red Alien animation state manager
   class RedAlienAnimationController {
-    constructor(basePath = 'animations/redalien'){
+    constructor(basePath = '/animations/redalien'){
       this.basePath = basePath;
       this.sprites = {}; // animType_direction -> { frames: [Image], frameW, frameH, loaded }
       this.enabled = false; // disabled until sprites load
@@ -150,9 +151,10 @@
   // Create global controller
   const controller = new RedAlienAnimationController();
   controller.init();
+  controller.loadAll();
   
   // Export to window
   window.redAlienAnimController = controller;
   
-  console.log('Red Alien animation controller initialized');
+  console.log('Red Alien animation controller initialized and loading...');
 })();
