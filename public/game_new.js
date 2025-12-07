@@ -50,6 +50,13 @@ resizeCanvas();
 const startBtn = document.getElementById('startBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const restartBtn = document.getElementById('restartBtn');
+
+console.log('UI Elements found:', {
+  startBtn: !!startBtn,
+  pauseBtn: !!pauseBtn,
+  restartBtn: !!restartBtn
+});
+
 const leaderboardBtn = document.getElementById('leaderboardBtn');
 const leaderboardList = document.getElementById('leaderboardList');
 const leaderboardModal = document.getElementById('leaderboardModal');
@@ -1033,12 +1040,15 @@ function startNextWave(){
 
 // Controls
 function startGameFromUI(){
+  console.log('startGameFromUI called');
   gameState = 'charSelect';
   startScreen.style.display = 'none';
   document.getElementById('charSelectScreen').style.display = 'flex';
+  console.log('Character select screen shown');
 }
 
 function startGameWithCharacter(charId){
+  console.log('startGameWithCharacter called with:', charId);
   selectedCharacter = charId;
   gameState = 'playing';
   document.getElementById('charSelectScreen').style.display = 'none';
@@ -1049,10 +1059,12 @@ function startGameWithCharacter(charId){
   running = true;
   // start loop if not already running
   if(rafId === null) rafId = requestAnimationFrame(loop);
+  console.log('Game started with character:', charId);
 }
 
 // Expose to window for main.js to call
 window.startGameWithCharacter = startGameWithCharacter;
+console.log('startGameWithCharacter exposed to window');
 
 function startGame(){
   gameState = 'playing';
@@ -1066,6 +1078,8 @@ function startGame(){
 }
 
 startBtn.addEventListener('click', startGameFromUI);
+console.log('Start button click listener added');
+
 if(pauseBtn) pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
 if(restartBtn) restartBtn.addEventListener('click', ()=>{ 
   // Stop the game

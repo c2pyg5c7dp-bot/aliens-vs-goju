@@ -141,8 +141,22 @@ function initializeCoopUI() {
   characterCards.forEach(card => {
     card.addEventListener('click', () => {
       const character = card.getAttribute('data-character');
+      console.log('Character card clicked:', character);
+      console.log('startGameWithCharacter available?', typeof window.startGameWithCharacter);
+      
       if (character && typeof window.startGameWithCharacter === 'function') {
+        console.log('Starting game with character:', character);
         window.startGameWithCharacter(character);
+      } else if (character) {
+        console.error('startGameWithCharacter not available, waiting...');
+        // Wait for game_new.js to load and try again
+        const checkInterval = setInterval(() => {
+          if (typeof window.startGameWithCharacter === 'function') {
+            clearInterval(checkInterval);
+            console.log('Game loaded, starting with character:', character);
+            window.startGameWithCharacter(character);
+          }
+        }, 100);
       }
     });
   });
