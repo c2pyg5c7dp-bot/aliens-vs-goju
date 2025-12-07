@@ -100,17 +100,57 @@
 
   <div id="lobbyScreen" class="overlay" style="display:none">
     <div class="panel">
-      <h1>Co-op Lobby</h1>
+      <h1>🎮 Co-op Lobby</h1>
       <div style="text-align: center; color: var(--fg);">
+        
+        <!-- Lobby Code / Invite Section -->
+        <div style="margin: 20px 0; padding: 15px; background: rgba(76, 175, 80, 0.2); border-radius: 8px; border: 2px solid #4CAF50;">
+          <h3 style="margin: 0 0 10px 0;">📋 Lobby Code</h3>
+          <div style="display: flex; gap: 10px; align-items: center; justify-content: center;">
+            <input type="text" id="lobbyCodeDisplay" readonly style="font-size: 24px; font-weight: bold; letter-spacing: 3px; text-align: center; padding: 10px; background: rgba(0,0,0,0.5); border: 2px solid #4CAF50; border-radius: 4px; color: #4CAF50; width: 200px;" value="XXXX">
+            <button id="copyLobbyCode" style="background: #4CAF50; padding: 10px 20px;">📋 Copy</button>
+            <button id="shareLobbyCode" style="background: #2196F3; padding: 10px 20px;">🔗 Share</button>
+          </div>
+          <p style="font-size: 12px; opacity: 0.7; margin: 5px 0 0 0;">Share this code with friends to invite them!</p>
+        </div>
+
+        <!-- Character Selection in Lobby -->
+        <div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+          <h3>🎭 Choose Your Character</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 15px 0;">
+            <div class="lobby-char-card" data-character="player" style="cursor: pointer; padding: 10px; background: rgba(255,255,255,0.1); border: 2px solid transparent; border-radius: 8px; transition: all 0.3s;">
+              <div style="font-size: 40px;">🧙</div>
+              <div style="font-weight: bold;">Player</div>
+              <div style="font-size: 11px; opacity: 0.7;">Balanced</div>
+            </div>
+            <div class="lobby-char-card" data-character="tank" style="cursor: pointer; padding: 10px; background: rgba(255,255,255,0.1); border: 2px solid transparent; border-radius: 8px; transition: all 0.3s;">
+              <div style="font-size: 40px;">🛡️</div>
+              <div style="font-weight: bold;">Tank</div>
+              <div style="font-size: 11px; opacity: 0.7;">Tanky</div>
+            </div>
+            <div class="lobby-char-card" data-character="speedster" style="cursor: pointer; padding: 10px; background: rgba(255,255,255,0.1); border: 2px solid transparent; border-radius: 8px; transition: all 0.3s;">
+              <div style="font-size: 40px;">⚡</div>
+              <div style="font-weight: bold;">Speedster</div>
+              <div style="font-size: 11px; opacity: 0.7;">Fast</div>
+            </div>
+            <div class="lobby-char-card" data-character="glass-cannon" style="cursor: pointer; padding: 10px; background: rgba(255,255,255,0.1); border: 2px solid transparent; border-radius: 8px; transition: all 0.3s;">
+              <div style="font-size: 40px;">💥</div>
+              <div style="font-weight: bold;">Glass Cannon</div>
+              <div style="font-size: 11px; opacity: 0.7;">High DMG</div>
+            </div>
+          </div>
+          <p id="yourCharacterSelection" style="font-size: 14px; color: #4CAF50; font-weight: bold; margin: 10px 0 0 0;">Your character: <span id="selectedCharName">None</span></p>
+        </div>
+
         <p id="lobbyStatus">Waiting for players...</p>
         <div id="playersList" style="margin: 20px 0; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-          <h3>Players in Lobby:</h3>
-          <div id="playersListContent">
+          <h3>👥 Players in Lobby:</h3>
+          <div id="playersListContent" style="display: flex; flex-direction: column; gap: 10px;">
             <p>Loading...</p>
           </div>
         </div>
-        <button id="startCoopBtn" style="background: #4CAF50; padding: 12px 24px; font-size: 16px;">Start Co-op Game</button>
-        <button id="leaveLobbyBtn" style="background: #f44336; margin-left: 12px;">Leave Lobby</button>
+        <button id="startCoopBtn" style="background: #4CAF50; padding: 12px 24px; font-size: 16px; font-weight: bold;">▶️ Start Co-op Game</button>
+        <button id="leaveLobbyBtn" style="background: #f44336; margin-left: 12px; padding: 12px 24px;">❌ Leave Lobby</button>
       </div>
     </div>
   </div>

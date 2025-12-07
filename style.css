@@ -48,6 +48,17 @@ canvas{
 .panel{width:540px; max-width:92%; background:linear-gradient(180deg,var(--panel), rgba(13,36,48,0.9)); border-radius:12px; padding:22px; box-shadow:0 8px 40px rgba(0,0,0,0.6); text-align:center}
 .panel h1{margin:4px 0 8px; font-size:28px; letter-spacing:0.6px}
 .controls{margin:12px 0}
+
+/* Lobby character selection cards */
+.lobby-char-card:hover {
+  background: rgba(255,255,255,0.2) !important;
+  transform: scale(1.05);
+}
+.lobby-char-card.selected {
+  border-color: #4CAF50 !important;
+  background: rgba(76, 175, 80, 0.3) !important;
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+}
 .controls button{margin:0 8px; padding:10px 18px; border-radius:8px; border:none; background:var(--accent); color:#042; font-weight:700; cursor:pointer}
 .desc{color:var(--muted); font-size:13px; margin-top:10px}
 

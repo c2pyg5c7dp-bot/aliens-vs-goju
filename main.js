@@ -137,17 +137,155 @@ function setupCoopButton(discordSdk, auth) {
         if (startScreen) startScreen.style.display = 'none';
         if (lobbyScreen) lobbyScreen.style.display = 'flex';
         
-        // Display static lobby info (no participant polling)
-        updateParticipantsList(discordSdk);
+        // Initialize lobby
+        initializeLobby(discordSdk, auth);
       });
     }
   }, 100);
 }
 
-async function updateParticipantsList(discordSdk) {
+// Lobby state
+let lobbyState = {
+  code: null,
+  players: {},
+  myCharacter: null
+};
+
+function generateLobbyCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 4; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+function initializeLobby(discordSdk, auth) {
+  // Generate lobby code
+  lobbyState.code = generateLobbyCode();
+  const lobbyCodeDisplay = document.getElementById('lobbyCodeDisplay');
+  if (lobbyCodeDisplay) lobbyCodeDisplay.value = lobbyState.code;
+  
+  // Set up copy button
+  const copyBtn = document.getElementById('copyLobbyCode');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(lobbyState.code).then(() => {
+        copyBtn.textContent = '✅ Copied!';
+        setTimeout(() => copyBtn.textContent = '📋 Copy', 2000);
+      });
+    });
+  }
+  
+  // Set up share button
+  const shareBtn = document.getElementById('shareLobbyCode');
+  if (shareBtn) {
+    shareBtn.addEventListener('click', () => {
+      const shareText = `Join my Aliens vs Goju co-op game! Code: ${lobbyState.code}`;
+      if (navigator.share) {
+        navigator.share({ text: shareText });
+      } else {
+        navigator.clipboard.writeText(shareText);
+        shareBtn.textContent = '✅ Copied!';
+        setTimeout(() => shareBtn.textContent = '🔗 Share', 2000);
+      }
+    });
+  }
+  
+  // Set up character selection in lobby
+  const charCards = document.querySelectorAll('.lobby-char-card');
+  charCards.forEach(card => {
+    card.addEventListener('click', () => {
+      const character = card.getAttribute('data-character');
+      
+      // Update selection UI
+      charCards.forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      
+      // Update state
+      lobbyState.myCharacter = character;
+      
+      // Update display
+      const charNameMap = {
+        'player': 'Player (Balanced)',
+        'tank': 'Tank (Tanky)',
+        'speedster': 'Speedster (Fast)',
+        'glass-cannon': 'Glass Cannon (High DMG)'
+      };
+      const selectedCharName = document.getElementById('selectedCharName');
+      if (selectedCharName) {
+        selectedCharName.textContent = charNameMap[character] || character;
+      }
+      
+      // Broadcast to other players (simplified - you'd use Discord SDK or WebSocket here)
+      console.log('Character selected:', character);
+      
+      // Update the players list to show new character
+      updateLobbyParticipants(discordSdk, auth);
+    });
+  });
+  
+  // Display participant info
+  updateLobbyParticipants(discordSdk, auth);
+}
+
+function updateLobbyParticipants(discordSdk, auth) {
   const playersListContent = document.getElementById('playersListContent');
   const lobbyStatus = document.getElementById('lobbyStatus');
   
+  if (!playersListContent) return;
+
+  // Show current user info
+  const username = auth?.user?.username || 'Player';
+  const userId = auth?.user?.id || 'local';
+  
+  const playerHtml = `
+    <div style="padding: 10px; background: rgba(76, 175, 80, 0.2); border-radius: 8px; border: 2px solid #4CAF50;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="font-size: 30px;">${lobbyState.myCharacter ? getCharacterEmoji(lobbyState.myCharacter) : '❓'}</div>
+          <div style="text-align: left;">
+            <div style="font-weight: bold; font-size: 16px;">${username} (You)</div>
+            <div style="font-size: 12px; opacity: 0.7;">${lobbyState.myCharacter ? getCharacterName(lobbyState.myCharacter) : 'No character selected'}</div>
+          </div>
+        </div>
+        <div style="background: #4CAF50; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">HOST</div>
+      </div>
+    </div>
+    <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; font-style: italic; opacity: 0.6;">
+      <div>Waiting for other players to join...</div>
+      <div style="font-size: 12px; margin-top: 5px;">Share the lobby code with friends!</div>
+    </div>
+  `;
+  
+  playersListContent.innerHTML = playerHtml;
+  
+  if (lobbyStatus) {
+    lobbyStatus.textContent = lobbyState.myCharacter 
+      ? `Ready! Share code: ${lobbyState.code}` 
+      : 'Select your character to continue';
+  }
+}
+
+function getCharacterEmoji(char) {
+  const emojiMap = {
+    'player': '🧙',
+    'tank': '🛡️',
+    'speedster': '⚡',
+    'glass-cannon': '💥'
+  };
+  return emojiMap[char] || '❓';
+}
+
+function getCharacterName(char) {
+  const nameMap = {
+    'player': 'Player (Balanced)',
+    'tank': 'Tank (Tanky)',
+    'speedster': 'Speedster (Fast)',
+    'glass-cannon': 'Glass Cannon (High DMG)'
+  };
+  return nameMap[char] || char;
+}
   if (playersListContent) {
     // Show static message since we can't get participants without OAuth2
     playersListContent.innerHTML = '<p>👤 You</p><p style="font-size: 12px; opacity: 0.7;">Share this Activity with friends to play together!</p>';
@@ -165,12 +303,27 @@ function initializeCoopUI() {
   
   if (startCoopBtn) {
     startCoopBtn.addEventListener('click', () => {
-      console.log('Starting co-op game');
-      const lobbyScreen = document.getElementById('lobbyScreen');
-      const charSelectScreen = document.getElementById('charSelectScreen');
+      // Check if character is selected
+      if (!lobbyState.myCharacter) {
+        alert('Please select a character before starting!');
+        return;
+      }
       
+      console.log('Starting co-op game with character:', lobbyState.myCharacter);
+      
+      // Hide lobby and start game with selected character
+      const lobbyScreen = document.getElementById('lobbyScreen');
       if (lobbyScreen) lobbyScreen.style.display = 'none';
-      if (charSelectScreen) charSelectScreen.style.display = 'flex';
+      
+      // Start game directly with the selected character
+      if (typeof window.startGameWithCharacter === 'function') {
+        window.startGameWithCharacter(lobbyState.myCharacter);
+      } else {
+        console.error('startGameWithCharacter not available');
+        // Fallback: show character select screen
+        const charSelectScreen = document.getElementById('charSelectScreen');
+        if (charSelectScreen) charSelectScreen.style.display = 'flex';
+      }
     });
   }
   
@@ -180,13 +333,14 @@ function initializeCoopUI() {
       const startScreen = document.getElementById('startScreen');
       
       window.isCoopMode = false;
+      lobbyState = { code: null, players: {}, myCharacter: null };
       
       if (lobbyScreen) lobbyScreen.style.display = 'none';
       if (startScreen) startScreen.style.display = 'flex';
     });
   }
   
-  // Set up character selection cards
+  // Set up character selection cards (for non-coop mode)
   const characterCards = document.querySelectorAll('.character-card');
   characterCards.forEach(card => {
     card.addEventListener('click', () => {
