@@ -1,8 +1,10 @@
 // Main entry point with Discord SDK integration
 console.log('🎮 main.js loading...');
+if (window.debugLog) window.debugLog('🎮 main.js loading...');
 
 import { setupDiscordSdk, getCurrentUser, getParticipants } from './discordSdk.js';
 console.log('✅ discordSdk.js imported successfully');
+if (window.debugLog) window.debugLog('✅ Discord SDK imported');
 
 // Store Discord SDK globally for game access
 window.discordSdk = null;
@@ -45,26 +47,33 @@ function loadGameNow() {
 
 async function init() {
   console.log('🚀 Init function started');
+  if (window.debugLog) window.debugLog('🚀 Init started');
   console.log('⏰ Timestamp:', new Date().toISOString());
   const loadingScreen = document.getElementById('loading-screen');
   console.log('Loading screen found in init:', !!loadingScreen);
+  if (window.debugLog) window.debugLog('Loading screen: ' + (loadingScreen ? 'FOUND' : 'NOT FOUND'));
   
   // FAILSAFE: Always remove loading screen after 3 seconds max
   setTimeout(() => {
     console.log('⏱️ Failsafe timeout triggered (3 seconds)');
+    if (window.debugLog) window.debugLog('⏱️ 3s Failsafe triggered');
     console.log('Failsafe: Force removing loading screen');
     const ls = document.getElementById('loading-screen');
     if (ls) {
       console.log('Failsafe: Loading screen element found, hiding it');
+      if (window.debugLog) window.debugLog('✅ Hiding loading screen');
       ls.style.display = 'none';
       console.log('✅ Failsafe: Loading screen hidden');
+      if (window.debugLog) window.debugLog('✅ Loading screen hidden');
     } else {
       console.error('❌ Failsafe: Loading screen element not found!');
+      if (window.debugLog) window.debugLog('❌ Loading screen not found!');
     }
   }, 3000);
   
   // Start loading game immediately
   console.log('⏱️ Scheduling loadGameNow in 500ms...');
+  if (window.debugLog) window.debugLog('⏱️ Starting game in 500ms...');
   setTimeout(loadGameNow, 500);
   
   // Initialize Discord SDK in parallel (non-blocking)
