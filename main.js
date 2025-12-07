@@ -1,5 +1,8 @@
 // Main entry point with Discord SDK integration
+console.log('🎮 main.js loading...');
+
 import { setupDiscordSdk, getCurrentUser, getParticipants } from './discordSdk.js';
+console.log('✅ discordSdk.js imported successfully');
 
 // Store Discord SDK globally for game access
 window.discordSdk = null;
