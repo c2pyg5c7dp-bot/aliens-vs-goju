@@ -37,7 +37,9 @@ export default defineConfig({
       }
     },
     // Copy game scripts as static assets instead of bundling
-    copyPublicDir: true
+    copyPublicDir: true,
+    // Force clean build to clear Vercel cache
+    emptyOutDir: true
   },
   publicDir: 'public'
 });
