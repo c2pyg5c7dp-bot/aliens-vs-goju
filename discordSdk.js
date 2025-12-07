@@ -35,7 +35,9 @@ export async function setupDiscordSdk() {
   }
 
   try {
-    discordSdk = new DiscordSDK(import.meta.env.VITE_DISCORD_CLIENT_ID);
+    // Use hardcoded client ID (from your Discord application)
+    const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID || '1446725465300664402';
+    discordSdk = new DiscordSDK(clientId);
 
     await discordSdk.ready();
     console.log("Discord SDK is ready");

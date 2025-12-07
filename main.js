@@ -27,6 +27,14 @@ async function init() {
   console.log('Init function started');
   const loadingScreen = document.getElementById('loading-screen');
   
+  // FAILSAFE: Always remove loading screen after 3 seconds max
+  setTimeout(() => {
+    console.log('Failsafe: Force removing loading screen');
+    if (loadingScreen) {
+      loadingScreen.style.display = 'none';
+    }
+  }, 3000);
+  
   // Start loading game immediately
   setTimeout(loadGameNow, 500);
   
