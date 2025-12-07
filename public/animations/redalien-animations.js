@@ -28,7 +28,7 @@
 
   // Red Alien animation state manager
   class RedAlienAnimationController {
-    constructor(basePath = 'animations/redalien'){
+    constructor(basePath = '/animations/redalien'){
       this.basePath = basePath;
       this.sprites = {}; // animType_direction -> { frames: [Image], frameW, frameH, loaded }
       this.enabled = false; // disabled until sprites load

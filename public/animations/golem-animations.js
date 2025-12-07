@@ -28,7 +28,7 @@
 
   // Golem animation state manager
   class GolemAnimationController {
-    constructor(basePath = 'animations/golem'){
+    constructor(basePath = '/animations/golem'){
       this.basePath = basePath;
       this.sprites = {}; // animType_direction -> { frames: [Image], frameW, frameH, loaded }
       this.enabled = false; // disabled until sprites load

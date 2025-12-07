@@ -28,7 +28,7 @@
 
   // Enemy animation state manager
   class EnemyAnimationController {
-    constructor(basePath = 'animations/enemies'){
+    constructor(basePath = '/animations/enemies'){
       this.basePath = basePath;
       this.sprites = {}; // animType_direction -> { frames: [Image], frameW, frameH, loaded }
       this.enabled = false; // disabled until sprites load

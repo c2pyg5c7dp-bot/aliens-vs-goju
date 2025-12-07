@@ -28,7 +28,7 @@
 
   // Player animation state manager
   class PlayerAnimationController {
-    constructor(basePath = 'animations/Player'){
+    constructor(basePath = '/animations/Player'){
       this.basePath = basePath;
       this.sprites = {}; // spriteKey -> { frames: [Image], frameW, frameH, loaded }
       this.currentAnim = null;
