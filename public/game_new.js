@@ -1051,6 +1051,9 @@ function startGameWithCharacter(charId){
   if(rafId === null) rafId = requestAnimationFrame(loop);
 }
 
+// Expose to window for main.js to call
+window.startGameWithCharacter = startGameWithCharacter;
+
 function startGame(){
   gameState = 'playing';
   running = true;
