@@ -45,6 +45,21 @@ canvas{
 
 /* Start screen */
 .overlay{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:40}
+
+/* Loading screen */
+.loading-screen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
 .panel{width:540px; max-width:92%; background:linear-gradient(180deg,var(--panel), rgba(13,36,48,0.9)); border-radius:12px; padding:22px; box-shadow:0 8px 40px rgba(0,0,0,0.6); text-align:center}
 .panel h1{margin:4px 0 8px; font-size:28px; letter-spacing:0.6px}
 .controls{margin:12px 0}
