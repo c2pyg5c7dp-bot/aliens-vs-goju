@@ -1122,6 +1122,20 @@ startBtn.addEventListener('click', () => {
   console.log('🎯 Start button CLICKED! (raw event)');
 }, { once: false });
 
+// Character selection handlers
+const characterCards = document.querySelectorAll('.character-card');
+console.log('Found character cards:', characterCards.length);
+characterCards.forEach(card => {
+  card.addEventListener('click', () => {
+    const charId = card.getAttribute('data-character');
+    console.log('Character card clicked:', charId);
+    if (charId) {
+      startGameWithCharacter(charId);
+    }
+  });
+});
+console.log('Character card click listeners added');
+
 if(pauseBtn) pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
 if(restartBtn) restartBtn.addEventListener('click', ()=>{ 
   // Stop the game
