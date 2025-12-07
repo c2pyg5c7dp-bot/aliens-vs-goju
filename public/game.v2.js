@@ -70,6 +70,11 @@ console.log('UI Elements found:', {
   restartBtn: !!restartBtn
 });
 
+if (!startBtn) {
+  console.error('CRITICAL: Start button not found!');
+  alert('Start button not found - game cannot start');
+}
+
 const leaderboardBtn = document.getElementById('leaderboardBtn');
 const leaderboardList = document.getElementById('leaderboardList');
 const leaderboardModal = document.getElementById('leaderboardModal');
@@ -1053,11 +1058,28 @@ function startNextWave(){
 
 // Controls
 function startGameFromUI(){
-  console.log('startGameFromUI called');
+  console.log('🚀 startGameFromUI called');
+  console.log('Current gameState:', gameState);
+  console.log('startScreen element:', document.getElementById('startScreen'));
+  console.log('charSelectScreen element:', document.getElementById('charSelectScreen'));
+  
   gameState = 'charSelect';
-  startScreen.style.display = 'none';
-  document.getElementById('charSelectScreen').style.display = 'flex';
-  console.log('Character select screen shown');
+  const startScreen = document.getElementById('startScreen');
+  const charSelectScreen = document.getElementById('charSelectScreen');
+  
+  if (startScreen) {
+    startScreen.style.display = 'none';
+    console.log('✅ Start screen hidden');
+  } else {
+    console.error('❌ Start screen element not found!');
+  }
+  
+  if (charSelectScreen) {
+    charSelectScreen.style.display = 'flex';
+    console.log('✅ Character select screen shown');
+  } else {
+    console.error('❌ Character select screen element not found!');
+  }
 }
 
 function startGameWithCharacter(charId){
@@ -1092,6 +1114,11 @@ function startGame(){
 
 startBtn.addEventListener('click', startGameFromUI);
 console.log('Start button click listener added');
+
+// Test click handler
+startBtn.addEventListener('click', () => {
+  console.log('🎯 Start button CLICKED! (raw event)');
+}, { once: false });
 
 if(pauseBtn) pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
 if(restartBtn) restartBtn.addEventListener('click', ()=>{ 
