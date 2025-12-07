@@ -1,7 +1,17 @@
 // Aliens vs Goju — A survival game
 
 const canvas = document.getElementById('game');
+if (!canvas) {
+  console.error('CRITICAL: Canvas element not found!');
+  alert('Game canvas not found. Please refresh the page.');
+  throw new Error('Canvas element with id="game" not found');
+}
 const ctx = canvas.getContext('2d');
+if (!ctx) {
+  console.error('CRITICAL: Cannot get 2D context!');
+  throw new Error('Cannot get 2D rendering context');
+}
+console.log('Canvas initialized successfully', { width: canvas.width, height: canvas.height });
 let DPR = window.devicePixelRatio || 1;
 
 function resizeCanvas(){
