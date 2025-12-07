@@ -17,6 +17,8 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 // UI Elements
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
 const restartBtn = document.getElementById('restartBtn');
 const leaderboardBtn = document.getElementById('leaderboardBtn');
 const leaderboardList = document.getElementById('leaderboardList');
@@ -1032,8 +1034,8 @@ function startGame(){
 }
 
 startBtn.addEventListener('click', startGameFromUI);
-pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
-restartBtn.addEventListener('click', ()=>{ 
+if(pauseBtn) pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
+if(restartBtn) restartBtn.addEventListener('click', ()=>{ 
   // Stop the game
   running = false;
   paused = false;
