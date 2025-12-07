@@ -3,6 +3,7 @@
 
 (function(){
   'use strict';
+  console.log('📦 Loading redalien-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -150,9 +151,10 @@
   // Create global controller
   const controller = new RedAlienAnimationController();
   controller.init();
+  controller.loadAll();
   
   // Export to window
   window.redAlienAnimController = controller;
   
-  console.log('Red Alien animation controller initialized');
+  console.log('Red Alien animation controller initialized and loading...');
 })();

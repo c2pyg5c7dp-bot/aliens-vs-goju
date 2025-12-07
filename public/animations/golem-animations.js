@@ -3,6 +3,7 @@
 
 (function(){
   'use strict';
+  console.log('📦 Loading golem-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -143,5 +144,6 @@
 
   // Expose to global scope
   window.golemAnimController = golemAnimController;
-  console.log('Golem animation controller initialized');
+  golemAnimController.loadAll();
+  console.log('Golem animation controller initialized and loading...');
 })();

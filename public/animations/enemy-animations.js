@@ -3,6 +3,7 @@
 
 (function(){
   'use strict';
+  console.log('📦 Loading enemy-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -155,6 +156,6 @@
 
   // Create global instance
   window.enemyAnimController = new EnemyAnimationController();
-
-  console.info('Enemy animation controller ready');
+  window.enemyAnimController.loadAll();
+  console.info('Enemy animation controller ready and loading...');
 })();
