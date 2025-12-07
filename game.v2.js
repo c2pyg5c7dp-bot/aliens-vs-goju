@@ -3,11 +3,6 @@
 console.log('🎮 game.v2.js loading...');
 console.log('Build: 2024-12-07-v4');
 console.log('Document ready state:', document.readyState);
-console.log('DOM elements:', {
-  canvas: document.getElementById('game'),
-  startBtn: document.getElementById('startBtn'),
-  characterCards: document.querySelectorAll('.character-card')
-});
 
 // Update loading screen
 const loadingGame = document.getElementById('loading-game');
@@ -1116,11 +1111,6 @@ function startGame(){
 
 startBtn.addEventListener('click', startGameFromUI);
 console.log('Start button click listener added');
-
-// Test click handler
-startBtn.addEventListener('click', () => {
-  console.log('🎯 Start button CLICKED! (raw event)');
-}, { once: false });
 
 // Character selection handlers
 const characterCards = document.querySelectorAll('.character-card');
