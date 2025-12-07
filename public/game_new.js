@@ -14,6 +14,9 @@ if (!ctx) {
 console.log('Canvas initialized successfully', { width: canvas.width, height: canvas.height });
 let DPR = window.devicePixelRatio || 1;
 
+// Game dimensions
+let W = window.innerWidth, H = window.innerHeight;
+
 function resizeCanvas(){
   DPR = window.devicePixelRatio || 1;
   
@@ -64,8 +67,7 @@ const healthEl = document.getElementById('health');
 const powerupsEl = document.getElementById('powerups');
 const waveEl = document.getElementById('wave');
 
-// Game state
-let W = window.innerWidth, H = window.innerHeight;
+// Game state (W and H already declared above before resizeCanvas)
 let gameState = 'menu'; // 'menu', 'playing', 'paused', 'leaderboard', 'charSelect'
 let running = false, paused = false;
 let score = 0, wave = 0;
