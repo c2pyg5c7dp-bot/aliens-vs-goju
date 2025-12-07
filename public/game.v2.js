@@ -466,21 +466,21 @@ const backgroundImage = new Image();
 backgroundImage.src = 'animations/background.png';
 let backgroundLoaded = false;
 backgroundImage.onload = () => { backgroundLoaded = true; };
-backgroundImage.onerror = () => { console.warn('Failed to load background.png'); };
+backgroundImage.onerror = () => { /* Background image optional */ };
 
 // Enemy health bar sprite sheet
 const enemyHealthBarImage = new Image();
 enemyHealthBarImage.src = 'animations/enemyhealthbar.png';
 let healthBarLoaded = false;
 enemyHealthBarImage.onload = () => { healthBarLoaded = true; };
-enemyHealthBarImage.onerror = () => { console.warn('Failed to load enemyhealthbar.png'); };
+enemyHealthBarImage.onerror = () => { /* Health bar image optional */ };
 
 // Nuke powerup image
 const nukeImage = new Image();
 nukeImage.src = 'animations/nuke.png';
 let nukeImageLoaded = false;
 nukeImage.onload = () => { nukeImageLoaded = true; };
-nukeImage.onerror = () => { console.warn('Failed to load nuke.png'); };
+nukeImage.onerror = () => { /* Nuke image optional */ };
 
 // Rocket launcher projectile sprite
 const rocketImage = new Image();
@@ -491,7 +491,7 @@ rocketImage.onload = () => {
   rocketImageLoaded = true; 
   rocketPowerupLoaded = true;
 };
-rocketImage.onerror = () => { console.warn('Failed to load rocket launcher sprite'); };
+rocketImage.onerror = () => { /* Rocket image optional */ };
 
 // Fireball projectile sprite
 const fireballImage = new Image();
@@ -502,7 +502,7 @@ fireballImage.onload = () => {
   fireballImageLoaded = true; 
   fireballPowerupLoaded = true;
 };
-fireballImage.onerror = () => { console.warn('Failed to load fireball sprite'); };
+fireballImage.onerror = () => { /* Fireball image optional */ };
 
 // Minigun powerup sprite
 const minigunImage = new Image();
@@ -511,7 +511,7 @@ let minigunPowerupLoaded = false;
 minigunImage.onload = () => { 
   minigunPowerupLoaded = true;
 };
-minigunImage.onerror = () => { console.warn('Failed to load minigun sprite'); };
+minigunImage.onerror = () => { /* Minigun image optional */ };
 
 // Shotgun powerup sprite
 const shotgunImage = new Image();
@@ -520,7 +520,7 @@ let shotgunPowerupLoaded = false;
 shotgunImage.onload = () => { 
   shotgunPowerupLoaded = true;
 };
-shotgunImage.onerror = () => { console.warn('Failed to load shotgun sprite'); };
+shotgunImage.onerror = () => { /* Shotgun image optional */ };
 
 // Speed powerup sprite
 const speedImage = new Image();
@@ -529,14 +529,14 @@ let speedPowerupLoaded = false;
 speedImage.onload = () => { 
   speedPowerupLoaded = true;
 };
-speedImage.onerror = () => { console.warn('Failed to load lightning sprite'); };
+speedImage.onerror = () => { /* Speed image optional */ };
 
 // Player health bar sprite sheet
 const playerHealthBarImage = new Image();
 playerHealthBarImage.src = 'animations/player health bar.png';
 let playerHealthBarLoaded = false;
 playerHealthBarImage.onload = () => { playerHealthBarLoaded = true; };
-playerHealthBarImage.onerror = () => { console.warn('Failed to load player health bar.png'); };
+playerHealthBarImage.onerror = () => { /* Player health bar image optional */ };
 
 // Score animation sprite sheet
 const scoreAnimImage = new Image();
@@ -546,7 +546,7 @@ let scoreAnimFrame = 0;
 let scoreAnimTimer = 0;
 const SCORE_ANIM_FRAME_TIME = 0.667; // 15% speed (slower animation)
 scoreAnimImage.onload = () => { scoreAnimLoaded = true; };
-scoreAnimImage.onerror = () => { console.warn('Failed to load score.png'); };
+scoreAnimImage.onerror = () => { /* Score image optional */ };
 
 // Digital number font sprite sheet (wave.png)
 const digitalFontImage = new Image();
@@ -555,7 +555,7 @@ let digitalFontLoaded = false;
 digitalFontImage.onload = () => { 
   digitalFontLoaded = true;
 };
-digitalFontImage.onerror = () => { console.warn('Failed to load wave.png'); };
+digitalFontImage.onerror = () => { /* Wave font image optional */ };
 
 // Digital font character mapping (based on sprite sheet layout)
 // Numbers are arranged: Row 0: 0 1 2 3 4, Row 1: 5 6 7 8 9
