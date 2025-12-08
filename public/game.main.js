@@ -86,6 +86,7 @@ const rewardDamage = document.getElementById('rewardDamage');
 const rewardRate = document.getElementById('rewardRate');
 const rewardSpeed = document.getElementById('rewardSpeed');
 const rewardMagnet = document.getElementById('rewardMagnet');
+let rewardSelected = false; // Flag to prevent multiple reward selections
 const scoreEl = document.getElementById('score');
 const healthEl = document.getElementById('health');
 const powerupsEl = document.getElementById('powerups');
@@ -96,11 +97,56 @@ let gameState = 'menu'; // 'menu', 'playing', 'paused', 'leaderboard', 'charSele
 let running = false, paused = false;
 let score = 0, wave = 0;
 let gameTime = 0; // Track elapsed game time in seconds
-let enemies = [], projectiles = [], powerups = [], particles = [], gems = [];
+let enemies = [], projectiles = [], powerups = [], particles = [], gems = [], hearts = [];
 let enemyProjectiles = []; // Red alien rock projectiles
+
+// Combo system
+let comboCount = 0;
+let comboMultiplier = 1.0;
+let comboTimer = 0;
+const COMBO_TIMEOUT = 3.0; // Seconds before combo resets
 let damageNumbers = []; // Floating damage numbers
 let lastTime = 0;
 let selectedCharacter = 'player'; // Default character
+
+// Permanent Upgrades System
+let totalGems = 0; // Lifetime gems collected
+let permanentUpgrades = {
+  maxHealth: 0,      // +2 health per level (max 10 levels)
+  damage: 0,         // +10% damage per level (max 10 levels)
+  fireRate: 0,       // +5% fire rate per level (max 10 levels)
+  moveSpeed: 0,      // +5% move speed per level (max 10 levels)
+  gemMagnet: 0       // +20% pickup range per level (max 5 levels)
+};
+
+// Load permanent upgrades from localStorage
+function loadPermanentUpgrades() {
+  try {
+    const saved = localStorage.getItem('permanentUpgrades');
+    if (saved) {
+      permanentUpgrades = JSON.parse(saved);
+    }
+    const savedGems = localStorage.getItem('totalGems');
+    if (savedGems) {
+      totalGems = parseInt(savedGems, 10);
+    }
+  } catch (e) {
+    console.error('Failed to load upgrades:', e);
+  }
+}
+
+// Save permanent upgrades to localStorage
+function savePermanentUpgrades() {
+  try {
+    localStorage.setItem('permanentUpgrades', JSON.stringify(permanentUpgrades));
+    localStorage.setItem('totalGems', totalGems.toString());
+  } catch (e) {
+    console.error('Failed to save upgrades:', e);
+  }
+}
+
+// Load upgrades on game start
+loadPermanentUpgrades();
 
 // Multiplayer player tracking
 let multiplayerPlayers = []; // Array of {id, name, score, character}
@@ -356,13 +402,14 @@ class Player {
   constructor(characterId = 'player'){
     const char = CHARACTERS[characterId] || CHARACTERS.player;
     this.x = W/2; this.y = H/2; this.radius = 14;
-    this.health = char.maxHealth; this.maxHealth = char.maxHealth;
-    this.speed = char.speed;
-    this.damage = char.damage;
-    this.fireRate = char.fireRate; this.fireTimer = 0;
+    this.maxHealth = char.maxHealth + (permanentUpgrades.maxHealth * 2);
+    this.health = this.maxHealth;
+    this.baseSpeed = char.speed * (1 + permanentUpgrades.moveSpeed * 0.05);
+    this.speed = this.baseSpeed;
+    this.damage = char.damage * (1 + permanentUpgrades.damage * 0.1);
+    this.fireRate = char.fireRate * (1 - permanentUpgrades.fireRate * 0.05); this.fireTimer = 0;
     this.weapon = 'standard';
     this.weapons = { standard: true };
-    this.baseSpeed = char.speed; // keep original base speed
     this.activePowerups = {}; // { type: remainingSeconds }
     this.fireballRingTimer = 0; // Timer for fireball ring damage ticks
     this.swordAngle = 0; // Track sword swing angle
@@ -376,7 +423,7 @@ class Player {
     this.dashDuration = 0.2; // Dash lasts 0.2 seconds
     this.dashTimer = 0;
     this.dashVelocity = { x: 0, y: 0 };
-    this.gemPickupRange = char.gemPickupRange; // Base pickup range
+    this.gemPickupRange = (char.gemPickupRange || 20) * (1 + permanentUpgrades.gemMagnet * 0.2); // Base pickup range
     this.characterId = characterId; // Track which character this is
     this.color = char.color; // Character color for fallback rendering
   }
@@ -455,6 +502,15 @@ class Gem {
   constructor(x, y, amount){
     this.x = x; this.y = y; this.amount = amount;
     this.radius = 5; this.life = 10;
+  }
+}
+
+class Heart {
+  constructor(x, y){
+    this.x = x; this.y = y;
+    this.radius = 8;
+    this.life = 15; // Lives longer than gems
+    this.healAmount = 4;
   }
 }
 
@@ -671,6 +727,24 @@ function spawnDamageNumber(x, y, damage) {
     life: 1.0,
     vy: -80 // Float upward
   });
+}
+
+function increaseCombo() {
+  comboCount++;
+  comboTimer = COMBO_TIMEOUT;
+  
+  // Calculate multiplier (caps at 4x)
+  comboMultiplier = Math.min(1.0 + (comboCount - 1) * 0.1, 4.0);
+}
+
+function resetCombo() {
+  if(comboCount > 0){
+    // Show combo broken message
+    spawnParticles(player.x, player.y - 40, '#ff4444', 20, 150);
+  }
+  comboCount = 0;
+  comboMultiplier = 1.0;
+  comboTimer = 0;
 }
 
 // Input
@@ -975,7 +1049,7 @@ function startWave(){
 function resetGame(){ 
   player = new Player(selectedCharacter); 
   // clear arrays in-place so external references (window.exports/tests) remain valid
-  enemies.length = 0; projectiles.length = 0; powerups.length = 0; particles.length = 0; gems.length = 0;
+  enemies.length = 0; projectiles.length = 0; powerups.length = 0; particles.length = 0; gems.length = 0; hearts.length = 0;
   enemyProjectiles.length = 0; // Clear enemy projectiles
   damageNumbers.length = 0; // Clear damage numbers
   spawnQueue.length = 0; spawnTimer = 0;
@@ -994,6 +1068,8 @@ function resetGame(){
 
 // Reward handlers
 rewardHealth.addEventListener('click', ()=>{ 
+  if(rewardSelected) return; // Prevent multiple selections
+  rewardSelected = true;
   // apply effect
   player.maxHealth += 3; player.health = Math.min(player.maxHealth, player.health + 3);
   const desc = `+Health +3 (max ${player.maxHealth})`;
@@ -1008,6 +1084,8 @@ rewardHealth.addEventListener('click', ()=>{
   setTimeout(()=>{ rewardModal.style.display = 'none'; paused = false; startNextWave(); }, 700);
 });
 rewardDamage.addEventListener('click', ()=>{ 
+  if(rewardSelected) return; // Prevent multiple selections
+  rewardSelected = true;
   player.damage += 0.5;
   const desc = `+Damage +0.5 (now ${player.damage.toFixed(2)})`;
   recordWaveReward(wave, desc);
@@ -1018,6 +1096,8 @@ rewardDamage.addEventListener('click', ()=>{
   setTimeout(()=>{ rewardModal.style.display = 'none'; paused = false; startNextWave(); }, 700);
 });
 rewardRate.addEventListener('click', ()=>{ 
+  if(rewardSelected) return; // Prevent multiple selections
+  rewardSelected = true;
   player.fireRate = Math.max(0.02, player.fireRate * 0.88);
   const desc = `Firerate x0.88 (now ${player.fireRate.toFixed(3)}s)`;
   recordWaveReward(wave, desc);
@@ -1028,6 +1108,8 @@ rewardRate.addEventListener('click', ()=>{
   setTimeout(()=>{ rewardModal.style.display = 'none'; paused = false; startNextWave(); }, 700);
 });
 rewardSpeed.addEventListener('click', ()=>{ 
+  if(rewardSelected) return; // Prevent multiple selections
+  rewardSelected = true;
   player.baseSpeed = Math.round(player.baseSpeed * 1.05);
   player.speed = player.baseSpeed;
   const desc = `+Speed +5% (now ${player.baseSpeed})`;
@@ -1039,6 +1121,8 @@ rewardSpeed.addEventListener('click', ()=>{
   setTimeout(()=>{ rewardModal.style.display = 'none'; paused = false; startNextWave(); }, 700);
 });
 rewardMagnet.addEventListener('click', ()=>{ 
+  if(rewardSelected) return; // Prevent multiple selections
+  rewardSelected = true;
   player.gemPickupRange += 30;
   const desc = `+Magnet Range +30 (now ${player.gemPickupRange})`;
   recordWaveReward(wave, desc);
@@ -1115,10 +1199,15 @@ startBtn.addEventListener('click', startGameFromUI);
 console.log('Start button click listener added');
 
 // Character selection handlers
-const characterCards = document.querySelectorAll('.character-card');
+const characterCards = document.querySelectorAll('.character-card-modern');
 console.log('Found character cards:', characterCards.length);
 characterCards.forEach(card => {
   card.addEventListener('click', () => {
+    // Remove selected class from all cards
+    characterCards.forEach(c => c.classList.remove('selected'));
+    // Add selected class to clicked card
+    card.classList.add('selected');
+    
     const charId = card.getAttribute('data-character');
     console.log('Character card clicked:', charId);
     if (charId) {
@@ -1384,6 +1473,7 @@ function update(dt){
       if(dist < e.radius + swordWidth){
         // Instant kill - set HP to 0
         e.hp = 0;
+        increaseCombo();
         score += 10 * player.scoreMultiplier;
         spawnParticles(e.x, e.y, '#ff9b9b', 12, 120);
         explodeSound();
@@ -1396,6 +1486,7 @@ function update(dt){
           powerups.push(new PowerUp(e.x, e.y, 'nuke'));
         }
         if(Math.random() < 0.2) gems.push(new Gem(e.x, e.y, 8));
+        if(Math.random() < 0.01) hearts.push(new Heart(e.x, e.y)); // 1% heart drop
         enemies.splice(i, 1);
       }
     }
@@ -1448,6 +1539,15 @@ function update(dt){
     nextWaveIndex++;
   }
 
+  // Update combo timer
+  if(comboCount > 0){
+    comboTimer -= dt;
+    if(comboTimer <= 0){
+      comboCount = 0;
+      comboMultiplier = 1.0;
+    }
+  }
+
   // Enemy movement and collision
   for(let i = enemies.length - 1; i >= 0; i--){
     const e = enemies[i];
@@ -1489,6 +1589,7 @@ function update(dt){
           const attackRadius = 100;
           if(Math.hypot(player.x - e.x, player.y - e.y) < attackRadius){
             player.health -= 8; // Fixed 8 damage per kick
+            resetCombo();
             spawnParticles(player.x, player.y, '#ff9b9b', 12, 120);
             explodeSound();
           }
@@ -1599,6 +1700,7 @@ function update(dt){
     // Contact damage (skip for golems and red aliens)
     if(!e.isGolem && !e.isRedAlien && Math.hypot(e.x - player.x, e.y - player.y) < e.radius + player.radius){
       player.health -= Math.max(1, Math.round(e.maxHp / 2));
+      resetCombo();
       spawnParticles(player.x, player.y, '#ff9b9b', 12, 120);
       explodeSound();
       enemies.splice(i, 1);
@@ -1656,6 +1758,7 @@ function update(dt){
           e.hp -= p.damage;
           spawnDamageNumber(e.x, e.y - e.radius, p.damage);
           if(e.hp <= 0){
+            increaseCombo();
             score += 10 * player.scoreMultiplier;
             spawnParticles(e.x, e.y, '#ffd', 18, 160);
             explodeSound();
@@ -1669,6 +1772,7 @@ function update(dt){
               powerups.push(new PowerUp(e.x, e.y, 'nuke'));
             }
             if(Math.random() < 0.2) gems.push(new Gem(e.x, e.y, 8));
+            if(Math.random() < 0.01) hearts.push(new Heart(e.x, e.y)); // 1% heart drop
             enemies.splice(j, 1);
           }
           hit = true;
@@ -1693,6 +1797,7 @@ function update(dt){
             e.hp -= p.damage;
             spawnDamageNumber(e.x, e.y - e.radius, p.damage);
             if(e.hp <= 0){
+              increaseCombo();
               score += 10 * player.scoreMultiplier;
               spawnParticles(e.x, e.y, '#ffd', 18, 160);
               explodeSound();
@@ -1709,6 +1814,7 @@ function update(dt){
                 powerups.push(new PowerUp(e.x, e.y, 'x2score'));
               }
               if(Math.random() < 0.2) gems.push(new Gem(e.x, e.y, 8));
+              if(Math.random() < 0.01) hearts.push(new Heart(e.x, e.y)); // 1% heart drop
               enemies.splice(j, 1);
             }
           }
@@ -1729,6 +1835,7 @@ function update(dt){
     // Check collision with player
     if(Math.hypot(p.x - player.x, p.y - player.y) < p.radius + player.radius){
       player.health -= p.damage;
+      resetCombo();
       spawnParticles(player.x, player.y, '#ff9b9b', 8, 100);
       explodeSound();
       enemyProjectiles.splice(i, 1);
@@ -1819,8 +1926,26 @@ function update(dt){
     }
     if(Math.hypot(g.x - player.x, g.y - player.y) < g.radius + player.gemPickupRange){
       score += 50 * player.scoreMultiplier;
+      totalGems += g.amount; // Add to permanent gem count
+      savePermanentUpgrades(); // Save immediately
       gems.splice(i, 1);
       beep(1400, 0.05, 'sine');
+    }
+  }
+
+  // Hearts
+  for(let i = hearts.length - 1; i >= 0; i--){
+    const h = hearts[i];
+    h.life -= dt;
+    if(h.life <= 0){
+      hearts.splice(i, 1);
+      continue;
+    }
+    if(Math.hypot(h.x - player.x, h.y - player.y) < h.radius + player.gemPickupRange){
+      player.health = Math.min(player.maxHealth, player.health + h.healAmount);
+      hearts.splice(i, 1);
+      beep(1600, 0.08, 'sine');
+      spawnParticles(player.x, player.y, '#ff69b4', 12, 100);
     }
   }
 
@@ -1853,6 +1978,7 @@ function update(dt){
         spawnParticles(e.x, e.y, '#ff6600', 2, 40);
       }
       if(e.hp <= 0){
+        increaseCombo();
         score += 10 * player.scoreMultiplier;
         spawnParticles(e.x, e.y, '#ff6600', 18, 160);
         explodeSound();
@@ -1869,6 +1995,7 @@ function update(dt){
           powerups.push(new PowerUp(e.x, e.y, 'x2score'));
         }
         if(Math.random() < 0.2) gems.push(new Gem(e.x, e.y, 8));
+        if(Math.random() < 0.01) hearts.push(new Heart(e.x, e.y)); // 1% heart drop
         enemies.splice(i, 1);
       }
     }
@@ -1984,6 +2111,7 @@ function update(dt){
       waveInProgress = false;
       if(waveRewardShownForWave !== wave){
         waveRewardShownForWave = wave;
+        rewardSelected = false; // Reset flag for new wave
         paused = true;
         rewardModal.style.display = 'flex';
         renderRewardSummary();
@@ -2014,6 +2142,24 @@ function draw(){
     ctx.beginPath();
     ctx.arc(g.x, g.y, g.radius, 0, Math.PI*2);
     ctx.fill();
+  });
+  
+  // Draw hearts
+  hearts.forEach(h => {
+    const size = h.radius;
+    ctx.fillStyle = '#ff69b4'; // Hot pink
+    ctx.strokeStyle = '#ff1493'; // Deeper pink outline
+    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.translate(h.x, h.y);
+    ctx.beginPath();
+    // Heart shape using bezier curves
+    ctx.moveTo(0, size * 0.3);
+    ctx.bezierCurveTo(-size, -size * 0.5, -size * 1.5, size * 0.5, 0, size * 1.2);
+    ctx.bezierCurveTo(size * 1.5, size * 0.5, size, -size * 0.5, 0, size * 0.3);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
   });
   
   enemies.forEach(e => drawEnemy(ctx, e));
@@ -2198,6 +2344,10 @@ function draw(){
   }
 
   // Draw player health bar sprite at top left (HUD area)
+  const barX = 15;
+  const barY = 15;
+  const scaledWidth = 200;
+  
   if(playerHealthBarLoaded){
     const healthPercent = player.health / player.maxHealth;
     const frameIndex = Math.max(0, Math.min(5, Math.floor(healthPercent * 6)));
@@ -2205,12 +2355,7 @@ function draw(){
     const barWidth = playerHealthBarImage.width;
     
     // Scale to reasonable HUD size (200px width)
-    const scaledWidth = 200;
     const scaledHeight = (frameHeight / barWidth) * scaledWidth;
-    
-    // Draw at top left above HUD
-    const barX = 15;
-    const barY = 15;
     
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
@@ -2238,17 +2383,29 @@ function draw(){
       ctx.strokeText(healthText, barX + scaledWidth/2, barY + scaledHeight/2 + 5);
       ctx.fillText(healthText, barX + scaledWidth/2, barY + scaledHeight/2 + 5);
     }
+  } else {
+    // Fallback HUD when image not loaded
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(barX, barY, scaledWidth, 40);
+    ctx.strokeStyle = '#4da6ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(barX, barY, scaledWidth, 40);
+    
+    const healthText = `HP: ${player.health}/${player.maxHealth}`;
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(healthText, barX + scaledWidth/2, barY + 25);
   }
   
   // Draw animated score sprite next to health bar
+  const scoreX = 230; // Right after health bar (15 + 200 + 15 spacing)
+  const scoreY = 15;
+  const scoreWidth = 180;
+  
   if(scoreAnimLoaded){
     const frameHeight = scoreAnimImage.height / 5; // 5 frames
     const frameWidth = scoreAnimImage.width;
-    
-    // Position to the right of health bar
-    const scoreX = 230; // Right after health bar (15 + 200 + 15 spacing)
-    const scoreY = 15;
-    const scoreWidth = 180;
     const scoreHeight = (frameHeight / frameWidth) * scoreWidth;
     
     ctx.save();
@@ -2277,6 +2434,56 @@ function draw(){
       ctx.strokeText(scoreText, scoreX + scoreWidth/2, scoreY + scoreHeight/2 + 6);
       ctx.fillText(scoreText, scoreX + scoreWidth/2, scoreY + scoreHeight/2 + 6);
     }
+  } else {
+    // Fallback HUD when image not loaded
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(scoreX, scoreY, scoreWidth, 40);
+    ctx.strokeStyle = '#4da6ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(scoreX, scoreY, scoreWidth, 40);
+    
+    const scoreText = `Score: ${score}`;
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(scoreText, scoreX + scoreWidth/2, scoreY + 25);
+  }
+
+  // Draw combo counter next to score (only if combo > 0)
+  if(comboCount > 0){
+    const comboX = 230 + 200; // After score display
+    const comboY = 20;
+    
+    // Determine color based on combo level
+    let comboColor = '#ffffff';
+    let glowColor = '#ffffff';
+    if(comboCount >= 50){
+      comboColor = '#ff0000';
+      glowColor = '#ff0000';
+    } else if(comboCount >= 30){
+      comboColor = '#ff00ff';
+      glowColor = '#ff00ff';
+    } else if(comboCount >= 20){
+      comboColor = '#ffaa00';
+      glowColor = '#ffaa00';
+    } else if(comboCount >= 10){
+      comboColor = '#00ffff';
+      glowColor = '#00ffff';
+    }
+    
+    // Draw glow effect
+    ctx.save();
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 15;
+    
+    // Draw combo text
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = comboColor;
+    const comboText = `${comboCount}x COMBO`;
+    ctx.fillText(comboText, comboX, comboY);
+    
+    ctx.restore();
   }
 
   // Draw multiplayer scoreboard in co-op mode

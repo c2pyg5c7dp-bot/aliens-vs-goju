@@ -6,18 +6,19 @@ console.log('🎨 Setting background color...');
 document.body.style.background = '#1a1a2e'; // Ensure we see something
 console.log('✅ Body background set');
 
-// Create visible debug display
-const debugDiv = document.createElement('div');
-debugDiv.id = 'debug-display';
-debugDiv.style.cssText = 'position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: #0f0; padding: 10px; font-family: monospace; font-size: 12px; z-index: 99999; max-width: 90%; max-height: 50%; overflow-y: auto; border: 2px solid #0f0;';
-document.body.appendChild(debugDiv);
+// Helper to get init debug section from main debug panel
+function getInitDebugSection() {
+  return document.getElementById('initDebugSection');
+}
 
 window.debugLog = function(msg) {
   console.log(msg);
-  const line = document.createElement('div');
-  line.textContent = new Date().toLocaleTimeString() + ' - ' + msg;
-  debugDiv.appendChild(line);
-  debugDiv.scrollTop = debugDiv.scrollHeight;
+  const debugSection = getInitDebugSection();
+  if (debugSection) {
+    const line = document.createElement('div');
+    line.textContent = new Date().toLocaleTimeString() + ' - ' + msg;
+    debugSection.appendChild(line);
+  }
 };
 
 window.debugLog('🟢 Debug display active');

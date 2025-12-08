@@ -1,33 +1,35 @@
 // Lobby functionality for co-op mode
 console.log('🎮 lobby.js loading...');
 
-// Create visible debug indicator
-const debugDiv = document.createElement('div');
-debugDiv.id = 'lobbyDebug';
-debugDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; background: lime; color: black; padding: 10px; z-index: 999999; font-size: 11px; border-radius: 5px; max-width: 350px; max-height: 400px; overflow-y: auto;';
-debugDiv.innerHTML = 'Lobby script loaded ✅<br>DOM ready: ' + document.readyState;
-
-// Wait for body to exist before appending
-if (document.body) {
-  document.body.appendChild(debugDiv);
-} else {
-  window.addEventListener('DOMContentLoaded', () => {
-    if (!document.getElementById('lobbyDebug')) {
-      document.body.appendChild(debugDiv);
-    }
-  });
+// Get lobby debug section from main debug panel
+function getLobbyDebugDiv() {
+  return document.getElementById('lobbyDebugSection');
 }
+
+function logToLobbyDebug(msg) {
+  const lobbyDebugDiv = getLobbyDebugDiv();
+  if (lobbyDebugDiv) {
+    lobbyDebugDiv.innerHTML += '<br>' + msg;
+  }
+}
+
+// Log initial load
+window.addEventListener('DOMContentLoaded', () => {
+  logToLobbyDebug('Lobby script loaded ✅');
+  logToLobbyDebug('DOM ready: ' + document.readyState);
+});
 
 // Log script loads
 window.addEventListener('load', () => {
-  if (debugDiv) debugDiv.innerHTML += '<br>Window loaded ✅';
-  if (debugDiv) debugDiv.innerHTML += '<br>game.v2.js: ' + (typeof window.startGameWithCharacter !== 'undefined' ? '✅' : '❌ NOT LOADED');
+  logToLobbyDebug('Window loaded ✅');
+  logToLobbyDebug('game.main.js: ' + (typeof window.startGameWithCharacter !== 'undefined' ? '✅' : '❌ NOT LOADED'));
 });
 
 // Lobby state
 const lobbyState = {
   code: null,
-  myCharacter: null
+  myCharacter: null,
+  isHost: false
 };
 
 function generateLobbyCode() {
@@ -70,6 +72,10 @@ function updateLobbyDisplay() {
   
   if (playersListContent) {
     const username = 'Player';
+    const hostBadge = lobbyState.isHost 
+      ? '<div style="background: #4CAF50; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">HOST</div>'
+      : '<div style="background: #2196F3; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">JOINED</div>';
+    
     const playerHtml = `
       <div style="padding: 10px; background: rgba(76, 175, 80, 0.2); border-radius: 8px; border: 2px solid #4CAF50;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -80,12 +86,12 @@ function updateLobbyDisplay() {
               <div style="font-size: 12px; opacity: 0.7;">${lobbyState.myCharacter ? getCharacterName(lobbyState.myCharacter) : 'No character selected'}</div>
             </div>
           </div>
-          <div style="background: #4CAF50; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">HOST</div>
+          ${hostBadge}
         </div>
       </div>
       <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; font-style: italic; opacity: 0.6;">
-        <div>Waiting for other players to join...</div>
-        <div style="font-size: 12px; margin-top: 5px;">Share the lobby code: ${lobbyState.code || 'XXXX'}</div>
+        <div>${lobbyState.isHost ? 'Waiting for other players to join...' : 'Waiting for host to start...'}</div>
+        <div style="font-size: 12px; margin-top: 5px;">${lobbyState.isHost ? 'Share the lobby code:' : 'Lobby code:'} ${lobbyState.code || 'XXXX'}</div>
       </div>
     `;
     playersListContent.innerHTML = playerHtml;
@@ -104,30 +110,113 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Co-op button
   const coopBtn = document.getElementById('coopBtn');
-  const debugDiv = document.getElementById('lobbyDebug');
   if (coopBtn) {
-    if (debugDiv) debugDiv.innerHTML += '<br>Co-op button found ✅';
+    logToLobbyDebug('Co-op button found ✅');
     coopBtn.addEventListener('click', () => {
       console.log('Co-op clicked!');
-      if (debugDiv) debugDiv.innerHTML += '<br>Co-op clicked! 🎮';
+      logToLobbyDebug('Co-op clicked! 🎮');
       
       // Generate lobby code
       lobbyState.code = generateLobbyCode();
+      lobbyState.isHost = true;
       const lobbyCodeDisplay = document.getElementById('lobbyCodeDisplay');
       if (lobbyCodeDisplay) lobbyCodeDisplay.value = lobbyState.code;
-      if (debugDiv) debugDiv.innerHTML += '<br>Code: ' + lobbyState.code;
+      logToLobbyDebug('Code: ' + lobbyState.code);
       
       // Show lobby
       const startScreen = document.getElementById('startScreen');
       const lobbyScreen = document.getElementById('lobbyScreen');
       if (startScreen) startScreen.style.display = 'none';
       if (lobbyScreen) lobbyScreen.style.display = 'flex';
-      if (debugDiv) debugDiv.innerHTML += '<br>Lobby shown ✅';
+      logToLobbyDebug('Lobby shown ✅');
       
       updateLobbyDisplay();
     });
   } else {
-    if (debugDiv) debugDiv.innerHTML += '<br>❌ Co-op button NOT found!';
+    logToLobbyDebug('❌ Co-op button NOT found!');
+  }
+
+  // Join Lobby button
+  const joinLobbyBtn = document.getElementById('joinLobbyBtn');
+  const joinLobbyModal = document.getElementById('joinLobbyModal');
+  const joinLobbyConfirm = document.getElementById('joinLobbyConfirm');
+  const joinLobbyCancel = document.getElementById('joinLobbyCancel');
+  const lobbyCodeInput = document.getElementById('lobbyCodeInput');
+  const joinError = document.getElementById('joinError');
+  
+  if (joinLobbyBtn && joinLobbyModal) {
+    logToLobbyDebug('Join Lobby button found ✅');
+    
+    // Show modal when button clicked
+    joinLobbyBtn.addEventListener('click', () => {
+      console.log('Join Lobby clicked!');
+      logToLobbyDebug('Join Lobby clicked! 🔗');
+      joinLobbyModal.style.display = 'flex';
+      lobbyCodeInput.value = '';
+      joinError.textContent = '';
+      lobbyCodeInput.focus();
+    });
+    
+    // Cancel button
+    joinLobbyCancel.addEventListener('click', () => {
+      joinLobbyModal.style.display = 'none';
+      lobbyCodeInput.value = '';
+      joinError.textContent = '';
+    });
+    
+    // Confirm button
+    joinLobbyConfirm.addEventListener('click', () => {
+      const code = lobbyCodeInput.value.toUpperCase().trim();
+      
+      // Validate code
+      if (code.length !== 4) {
+        joinError.textContent = '⚠️ Code must be 4 characters';
+        return;
+      }
+      
+      if (!/^[A-Z0-9]{4}$/.test(code)) {
+        joinError.textContent = '⚠️ Code must be letters and numbers only';
+        return;
+      }
+      
+      console.log('Joining lobby with code:', code);
+      logToLobbyDebug('Joining lobby: ' + code);
+      
+      // Set lobby state as joiner
+      lobbyState.code = code;
+      lobbyState.isHost = false;
+      
+      // Hide modal and start screen
+      joinLobbyModal.style.display = 'none';
+      const startScreen = document.getElementById('startScreen');
+      const lobbyScreen = document.getElementById('lobbyScreen');
+      if (startScreen) startScreen.style.display = 'none';
+      if (lobbyScreen) lobbyScreen.style.display = 'flex';
+      
+      // Update lobby display for joined lobby
+      const lobbyCodeDisplay = document.getElementById('lobbyCodeDisplay');
+      if (lobbyCodeDisplay) lobbyCodeDisplay.value = code;
+      
+      updateLobbyDisplay();
+      
+      // TODO: Actual multiplayer connection would go here
+      // For now, just show the lobby screen
+      logToLobbyDebug('Joined lobby ✅');
+    });
+    
+    // Auto-uppercase input
+    lobbyCodeInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+    
+    // Enter key to submit
+    lobbyCodeInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        joinLobbyConfirm.click();
+      }
+    });
+  } else {
+    logToLobbyDebug('❌ Join Lobby elements NOT found!');
   }
   
   // Copy button

@@ -43,18 +43,6 @@ if(enemySpeedDec){
   });
 }
 
-// Load animations when scripts are ready
-setTimeout(()=>{
-  if(window.playerAnimController){
-    console.info('Loading player animations...');
-    window.playerAnimController.loadAll();
-  }
-  if(window.enemyAnimController){
-    console.info('Loading enemy animations...');
-    window.enemyAnimController.loadAll();
-  }
-}, 100);
-
 // Test Runner
 const testOutput = document.getElementById('testOutput');
 const runTestBtn = document.getElementById('runTestBtn');
