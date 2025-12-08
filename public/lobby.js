@@ -71,12 +71,18 @@ function updateLobbyDisplay() {
   }
   
   if (playersListContent) {
-    const username = 'Player';
+    // Get all players from network manager
+    const allPlayers = window.networkManager ? window.networkManager.getPlayers() : [];
+    
+    let playersHtml = '';
+    
+    // Add local player first
+    const username = 'Player' + (window.networkManager?.localPlayerId?.slice(-4) || '');
     const hostBadge = lobbyState.isHost 
       ? '<div style="background: #4CAF50; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">HOST</div>'
       : '<div style="background: #2196F3; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">JOINED</div>';
     
-    const playerHtml = `
+    playersHtml += `
       <div style="padding: 10px; background: rgba(76, 175, 80, 0.2); border-radius: 8px; border: 2px solid #4CAF50;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 10px;">
@@ -89,12 +95,38 @@ function updateLobbyDisplay() {
           ${hostBadge}
         </div>
       </div>
-      <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; font-style: italic; opacity: 0.6;">
-        <div>${lobbyState.isHost ? 'Waiting for other players to join...' : 'Waiting for host to start...'}</div>
-        <div style="font-size: 12px; margin-top: 5px;">${lobbyState.isHost ? 'Share the lobby code:' : 'Lobby code:'} ${lobbyState.code || 'XXXX'}</div>
-      </div>
     `;
-    playersListContent.innerHTML = playerHtml;
+    
+    // Add remote players
+    allPlayers.filter(p => !p.isLocal).forEach(player => {
+      const playerBadge = '<div style="background: #666; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">PLAYER</div>';
+      playersHtml += `
+        <div style="padding: 10px; background: rgba(33, 150, 243, 0.2); border-radius: 8px; border: 2px solid #2196F3;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="font-size: 30px;">${player.character ? getCharacterEmoji(player.character) : '❓'}</div>
+              <div style="text-align: left;">
+                <div style="font-weight: bold; font-size: 16px;">${player.name}</div>
+                <div style="font-size: 12px; opacity: 0.7;">${player.character ? getCharacterName(player.character) : 'Selecting...'}</div>
+              </div>
+            </div>
+            ${playerBadge}
+          </div>
+        </div>
+      `;
+    });
+    
+    // Show waiting message if alone
+    if (allPlayers.filter(p => !p.isLocal).length === 0) {
+      playersHtml += `
+        <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; font-style: italic; opacity: 0.6;">
+          <div>${lobbyState.isHost ? 'Waiting for other players to join...' : 'Waiting for host to start...'}</div>
+          <div style="font-size: 12px; margin-top: 5px;">${lobbyState.isHost ? 'Share the lobby code:' : 'Lobby code:'} ${lobbyState.code || 'XXXX'}</div>
+        </div>
+      `;
+    }
+    
+    playersListContent.innerHTML = playersHtml;
   }
   
   if (lobbyStatus) {
@@ -112,25 +144,54 @@ document.addEventListener('DOMContentLoaded', () => {
   const coopBtn = document.getElementById('coopBtn');
   if (coopBtn) {
     logToLobbyDebug('Co-op button found ✅');
-    coopBtn.addEventListener('click', () => {
+    coopBtn.addEventListener('click', async () => {
       console.log('Co-op clicked!');
       logToLobbyDebug('Co-op clicked! 🎮');
       
-      // Generate lobby code
-      lobbyState.code = generateLobbyCode();
-      lobbyState.isHost = true;
-      const lobbyCodeDisplay = document.getElementById('lobbyCodeDisplay');
-      if (lobbyCodeDisplay) lobbyCodeDisplay.value = lobbyState.code;
-      logToLobbyDebug('Code: ' + lobbyState.code);
-      
-      // Show lobby
-      const startScreen = document.getElementById('startScreen');
-      const lobbyScreen = document.getElementById('lobbyScreen');
-      if (startScreen) startScreen.style.display = 'none';
-      if (lobbyScreen) lobbyScreen.style.display = 'flex';
-      logToLobbyDebug('Lobby shown ✅');
-      
-      updateLobbyDisplay();
+      try {
+        // Initialize network manager if not already
+        if (!window.networkManager.peer) {
+          logToLobbyDebug('🔌 Initializing PeerJS...');
+          await window.networkManager.init();
+          logToLobbyDebug('✅ PeerJS ready!');
+        }
+        
+        // Generate lobby code and create room
+        const code = window.networkManager.createRoom();
+        lobbyState.code = code;
+        lobbyState.isHost = true;
+        
+        // Set up network callbacks
+        window.networkManager.onPlayerJoined = (playerId, playerName) => {
+          console.log('👋 Player joined:', playerName);
+          logToLobbyDebug(`✅ ${playerName} joined!`);
+          updateLobbyDisplay();
+        };
+        
+        window.networkManager.onPlayerLeft = (playerId) => {
+          console.log('👋 Player left:', playerId);
+          logToLobbyDebug(`❌ Player left: ${playerId}`);
+          updateLobbyDisplay();
+        };
+        
+        const lobbyCodeDisplay = document.getElementById('lobbyCodeDisplay');
+        if (lobbyCodeDisplay) lobbyCodeDisplay.value = code;
+        logToLobbyDebug('Code: ' + code);
+        
+        // Show lobby
+        const startScreen = document.getElementById('startScreen');
+        const lobbyScreen = document.getElementById('lobbyScreen');
+        if (startScreen) startScreen.style.display = 'none';
+        if (lobbyScreen) lobbyScreen.style.display = 'flex';
+        logToLobbyDebug('Lobby shown ✅');
+        
+        updateLobbyDisplay();
+        
+      } catch (error) {
+        console.error('❌ Failed to create lobby:', error);
+        logToLobbyDebug('❌ Error: ' + error.message);
+        alert('Failed to create lobby. Please check your internet connection.');
+      }
     });
   } else {
     logToLobbyDebug('❌ Co-op button NOT found!');
@@ -165,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Confirm button
-    joinLobbyConfirm.addEventListener('click', () => {
+    joinLobbyConfirm.addEventListener('click', async () => {
       const code = lobbyCodeInput.value.toUpperCase().trim();
       
       // Validate code
@@ -179,29 +240,75 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      console.log('Joining lobby with code:', code);
-      logToLobbyDebug('Joining lobby: ' + code);
-      
-      // Set lobby state as joiner
-      lobbyState.code = code;
-      lobbyState.isHost = false;
-      
-      // Hide modal and start screen
-      joinLobbyModal.style.display = 'none';
-      const startScreen = document.getElementById('startScreen');
-      const lobbyScreen = document.getElementById('lobbyScreen');
-      if (startScreen) startScreen.style.display = 'none';
-      if (lobbyScreen) lobbyScreen.style.display = 'flex';
-      
-      // Update lobby display for joined lobby
-      const lobbyCodeDisplay = document.getElementById('lobbyCodeDisplay');
-      if (lobbyCodeDisplay) lobbyCodeDisplay.value = code;
-      
-      updateLobbyDisplay();
-      
-      // TODO: Actual multiplayer connection would go here
-      // For now, just show the lobby screen
-      logToLobbyDebug('Joined lobby ✅');
+      try {
+        logToLobbyDebug('🔌 Joining lobby: ' + code);
+        joinError.textContent = '🔄 Connecting...';
+        joinError.style.color = '#2196F3';
+        
+        // Initialize network manager if not already
+        if (!window.networkManager.peer) {
+          logToLobbyDebug('🔌 Initializing PeerJS...');
+          await window.networkManager.init();
+          logToLobbyDebug('✅ PeerJS ready!');
+        }
+        
+        // Join the room
+        const success = await window.networkManager.joinRoom(code);
+        
+        if (!success) {
+          joinError.textContent = '❌ Room not found or connection failed';
+          joinError.style.color = '#f44336';
+          logToLobbyDebug('❌ Failed to join room');
+          return;
+        }
+        
+        // Set up callbacks
+        window.networkManager.onPlayerJoined = (playerId, playerName) => {
+          console.log('👋 Player joined:', playerName);
+          logToLobbyDebug(`✅ ${playerName} joined!`);
+          updateLobbyDisplay();
+        };
+        
+        window.networkManager.onPlayerLeft = (playerId) => {
+          console.log('👋 Player left:', playerId);
+          logToLobbyDebug(`❌ Player left: ${playerId}`);
+          updateLobbyDisplay();
+        };
+        
+        window.networkManager.onStartGame = (players) => {
+          console.log('🎮 Game starting with players:', players);
+          // Hide lobby and start game
+          const lobbyScreen = document.getElementById('lobbyScreen');
+          if (lobbyScreen) lobbyScreen.style.display = 'none';
+          
+          if (lobbyState.myCharacter && typeof window.startGameWithCharacter === 'function') {
+            window.startGameWithCharacter(lobbyState.myCharacter);
+          }
+        };
+        
+        // Success!
+        lobbyState.code = code;
+        lobbyState.isHost = false;
+        
+        // Hide modal and show lobby
+        joinLobbyModal.style.display = 'none';
+        const startScreen = document.getElementById('startScreen');
+        const lobbyScreen = document.getElementById('lobbyScreen');
+        if (startScreen) startScreen.style.display = 'none';
+        if (lobbyScreen) lobbyScreen.style.display = 'flex';
+        
+        const lobbyCodeDisplay = document.getElementById('lobbyCodeDisplay');
+        if (lobbyCodeDisplay) lobbyCodeDisplay.value = code;
+        
+        updateLobbyDisplay();
+        logToLobbyDebug('✅ Joined lobby! Code: ' + code);
+        
+      } catch (error) {
+        console.error('❌ Join error:', error);
+        joinError.textContent = '❌ Connection failed: ' + error.message;
+        joinError.style.color = '#f44336';
+        logToLobbyDebug('❌ Error: ' + error.message);
+      }
     });
     
     // Auto-uppercase input
@@ -259,6 +366,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // Update state
       lobbyState.myCharacter = character;
       
+      // Send to network
+      if (window.networkManager && window.networkManager.peer) {
+        window.networkManager.selectCharacter(character);
+        console.log('📤 Sent character selection:', character);
+      }
+      
       // Refresh display
       updateLobbyDisplay();
     });
@@ -279,6 +392,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return;
     }      console.log('Starting game with:', lobbyState.myCharacter);
+      
+      // Enable co-op mode
+      window.isCoopMode = true;
+      
+      // If host, trigger network game start
+      if (lobbyState.isHost && window.networkManager) {
+        window.networkManager.startGame();
+      }
       
       // Hide lobby
       const lobbyScreen = document.getElementById('lobbyScreen');
@@ -308,9 +429,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (lobbyScreen) lobbyScreen.style.display = 'none';
       if (startScreen) startScreen.style.display = 'flex';
       
+      // Disconnect from network
+      if (window.networkManager) {
+        window.networkManager.disconnect();
+      }
+      
       // Reset state
       lobbyState.code = null;
       lobbyState.myCharacter = null;
+      window.isCoopMode = false;
     });
   }
   

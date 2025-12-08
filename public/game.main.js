@@ -149,7 +149,7 @@ function savePermanentUpgrades() {
 loadPermanentUpgrades();
 
 // Multiplayer player tracking
-let multiplayerPlayers = []; // Array of {id, name, score, character}
+let multiplayerPlayers = []; // Array of {id, name, score, character, position, health}
 function updateMultiplayerScore(playerId, playerName, playerScore, playerCharacter) {
   const existing = multiplayerPlayers.find(p => p.id === playerId);
   if (existing) {
@@ -157,9 +157,45 @@ function updateMultiplayerScore(playerId, playerName, playerScore, playerCharact
     existing.name = playerName;
     existing.character = playerCharacter;
   } else {
-    multiplayerPlayers.push({ id: playerId, name: playerName, score: playerScore, character: playerCharacter });
+    multiplayerPlayers.push({ id: playerId, name: playerName, score: playerScore, character: playerCharacter, x: 0, y: 0, health: 0 });
   }
 }
+
+// Network sync timer
+let networkSyncTimer = 0;
+const NETWORK_SYNC_INTERVAL = 0.1; // Send updates 10 times per second
+
+// Send game state to other players
+function sendGameState() {
+  if (!window.networkManager || !window.networkManager.peer) return;
+  
+  window.networkManager.sendGameState({
+    position: { x: player.x, y: player.y },
+    health: player.health,
+    score: score
+  });
+}
+
+// Handle received game state from other players
+function handleGameStateUpdate(data) {
+  if (!data || !data.playerId) return;
+  
+  const p = multiplayerPlayers.find(player => player.id === data.playerId);
+  if (p) {
+    if (data.position) {
+      p.x = data.position.x;
+      p.y = data.position.y;
+    }
+    if (data.health !== undefined) p.health = data.health;
+    if (data.score !== undefined) p.score = data.score;
+  }
+}
+
+// Setup network callbacks
+if (window.networkManager) {
+  window.networkManager.onGameStateUpdate = handleGameStateUpdate;
+}
+
 
 // Character definitions
 const CHARACTERS = {
@@ -1347,7 +1383,16 @@ function update(dt){
   // Update game timer
   gameTime += dt;
   
-  // Broadcast score in co-op mode every second
+  // Network sync in co-op mode
+  if (window.isCoopMode && window.networkManager && window.networkManager.peer) {
+    networkSyncTimer += dt;
+    if (networkSyncTimer >= NETWORK_SYNC_INTERVAL) {
+      networkSyncTimer = 0;
+      sendGameState();
+    }
+  }
+  
+  // Broadcast score in co-op mode every second (legacy - replaced by sendGameState)
   if (window.isCoopMode) {
     if (!window.scoreBroadcastTimer) window.scoreBroadcastTimer = 0;
     window.scoreBroadcastTimer += dt;
@@ -2281,6 +2326,48 @@ function draw(){
     ctx.fillRect(p.x, p.y, 2, 2);
     ctx.globalAlpha = 1;
   });
+  
+  // Draw other players in co-op mode
+  if (window.isCoopMode && multiplayerPlayers.length > 0) {
+    multiplayerPlayers.forEach(mp => {
+      if (!mp.x || !mp.y) return; // Skip if no position data yet
+      
+      // Draw player as colored circle with name
+      const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0'];
+      const colorIndex = Math.abs(mp.id.charCodeAt(0)) % colors.length;
+      
+      // Player circle
+      ctx.fillStyle = colors[colorIndex];
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(mp.x, mp.y, 20, 0, Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+      
+      // Player name
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.strokeText(mp.name || 'Player', mp.x, mp.y - 30);
+      ctx.fillText(mp.name || 'Player', mp.x, mp.y - 30);
+      
+      // Health bar
+      if (mp.health > 0) {
+        const barWidth = 40;
+        const barHeight = 4;
+        const healthPercent = Math.max(0, Math.min(1, mp.health / 20)); // Assume max 20 health
+        
+        ctx.fillStyle = '#333';
+        ctx.fillRect(mp.x - barWidth/2, mp.y + 25, barWidth, barHeight);
+        
+        ctx.fillStyle = healthPercent > 0.5 ? '#4CAF50' : healthPercent > 0.25 ? '#FFC107' : '#F44336';
+        ctx.fillRect(mp.x - barWidth/2, mp.y + 25, barWidth * healthPercent, barHeight);
+      }
+    });
+  }
   
   // Draw damage numbers with digital font
   damageNumbers.forEach(dn => {

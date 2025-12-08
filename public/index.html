@@ -8,6 +8,8 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <title>Aliens vs Goju</title>
   <link rel="stylesheet" href="/style.css">
+  <!-- PeerJS for P2P multiplayer -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <style>
     /* iOS Safe Area Support */
     @supports(padding: max(0px)) {
@@ -581,6 +583,9 @@
     </div>
     </div>
   </div>
+
+  <!-- NetworkManager for multiplayer -->
+  <script src="/NetworkManager.js?v=1"></script>
 
   <!-- Lobby functionality loaded as external script for Discord compatibility -->
   <script defer src="/lobby.js?v=7"></script>
