@@ -145,10 +145,12 @@
         <!-- Lobby Code / Invite Section -->
         <div style="margin: 20px 0; padding: 15px; background: rgba(76, 175, 80, 0.2); border-radius: 8px; border: 2px solid #4CAF50;">
           <h3 style="margin: 0 0 10px 0;">📋 Lobby Code</h3>
-          <div style="display: flex; gap: 10px; align-items: center; justify-content: center;">
-            <input type="text" id="lobbyCodeDisplay" readonly style="font-size: 24px; font-weight: bold; letter-spacing: 3px; text-align: center; padding: 10px; background: rgba(0,0,0,0.5); border: 2px solid #4CAF50; border-radius: 4px; color: #4CAF50; width: 200px;" value="XXXX">
-            <button id="copyLobbyCode" style="background: #4CAF50; padding: 10px 20px;">📋 Copy</button>
-            <button id="shareLobbyCode" style="background: #2196F3; padding: 10px 20px;">🔗 Share</button>
+          <div style="display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;">
+            <input type="text" id="lobbyCodeDisplay" readonly style="font-size: 16px; font-weight: bold; letter-spacing: 1px; text-align: center; padding: 10px; background: rgba(0,0,0,0.5); border: 2px solid #4CAF50; border-radius: 4px; color: #4CAF50; width: 100%; max-width: 500px; word-break: break-all;" value="XXXX">
+            <div style="display: flex; gap: 10px;">
+              <button id="copyLobbyCode" style="background: #4CAF50; padding: 10px 20px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold;">📋 Copy</button>
+              <button id="shareLobbyCode" style="background: #2196F3; padding: 10px 20px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold;">🔗 Share</button>
+            </div>
           </div>
           <p style="font-size: 12px; opacity: 0.7; margin: 5px 0 0 0;">Share this code with friends to invite them!</p>
         </div>

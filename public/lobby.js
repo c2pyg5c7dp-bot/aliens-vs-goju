@@ -191,8 +191,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         const lobbyCodeDisplay = document.getElementById('lobbyCodeDisplay');
-        if (lobbyCodeDisplay) lobbyCodeDisplay.value = code;
-        logToLobbyDebug('Code: ' + code);
+        if (lobbyCodeDisplay) {
+          // Display the full shareable code in the input
+          lobbyCodeDisplay.value = shareableCode;
+        }
+        logToLobbyDebug('Code: ' + shareableCode);
         
         // Show lobby
         const startScreen = document.getElementById('startScreen');
@@ -272,6 +275,9 @@ document.addEventListener('DOMContentLoaded', () => {
       
       try {
         logToLobbyDebug('🔌 Joining lobby: ' + code);
+        if (hostPeerId) {
+          logToLobbyDebug('🎯 Using host peer ID: ' + hostPeerId);
+        }
         joinError.textContent = '🔄 Connecting...';
         joinError.style.color = '#2196F3';
         
