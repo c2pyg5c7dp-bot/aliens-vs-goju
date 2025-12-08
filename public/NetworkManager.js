@@ -23,6 +23,13 @@ class NetworkManager {
   init() {
     return new Promise((resolve, reject) => {
       try {
+        // Check if Peer is available
+        if (typeof Peer === 'undefined') {
+          console.error('❌ PeerJS library not loaded!');
+          reject(new Error('PeerJS library not loaded. Please refresh the page.'));
+          return;
+        }
+        
         // Create peer with a random ID
         this.peer = new Peer({
           config: {
@@ -684,6 +691,19 @@ class NetworkManager {
   }
 }
 
-// Create global instance
-window.networkManager = new NetworkManager();
-console.log('✅ NetworkManager loaded!');
+// Wait for PeerJS to be loaded before creating instance
+if (typeof Peer === 'undefined') {
+  console.warn('⚠️ PeerJS not yet loaded, waiting...');
+  window.addEventListener('load', () => {
+    if (typeof Peer !== 'undefined') {
+      window.networkManager = new NetworkManager();
+      console.log('✅ NetworkManager loaded!');
+    } else {
+      console.error('❌ PeerJS failed to load!');
+    }
+  });
+} else {
+  // Create global instance
+  window.networkManager = new NetworkManager();
+  console.log('✅ NetworkManager loaded!');
+}

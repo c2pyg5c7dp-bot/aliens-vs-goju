@@ -153,6 +153,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!window.networkManager) {
           console.error('❌ NetworkManager not loaded!');
           logToLobbyDebug('❌ NetworkManager not loaded!');
+          alert('Multiplayer is not available. Please refresh the page and try again.');
+          return;
+        }
+        
+        // Check if PeerJS is available
+        if (typeof Peer === 'undefined') {
+          console.error('❌ PeerJS library not loaded!');
+          logToLobbyDebug('❌ PeerJS library not loaded!');
+          alert('Multiplayer library failed to load. Please check your internet connection and refresh the page.');
           return;
         }
         
@@ -284,9 +293,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Ensure NetworkManager is loaded
         if (!window.networkManager) {
           console.error('❌ NetworkManager not loaded!');
-          joinError.textContent = '❌ NetworkManager not loaded';
+          joinError.textContent = '❌ Multiplayer not available';
           joinError.style.color = '#f44336';
           logToLobbyDebug('❌ NetworkManager not loaded!');
+          alert('Multiplayer is not available. Please refresh the page and try again.');
+          return;
+        }
+        
+        // Check if PeerJS is available
+        if (typeof Peer === 'undefined') {
+          console.error('❌ PeerJS library not loaded!');
+          joinError.textContent = '❌ Multiplayer library not loaded';
+          joinError.style.color = '#f44336';
+          logToLobbyDebug('❌ PeerJS library not loaded!');
+          alert('Multiplayer library failed to load. Please check your internet connection and refresh the page.');
           return;
         }
         
