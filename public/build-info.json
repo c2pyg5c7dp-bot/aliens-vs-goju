@@ -1,0 +1,11 @@
+{
+  "version": "1.0.5",
+  "buildTime": "2024-12-07T20:00:00Z",
+  "commit": "1378e3a",
+  "fixes": [
+    "Removed all inline scripts for Discord CSP compliance",
+    "Fixed file structure - all assets in public/",
+    "Removed blocking alerts and fatal throws",
+    "Updated cache busting to v5"
+  ]
+}
