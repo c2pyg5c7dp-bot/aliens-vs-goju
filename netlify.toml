@@ -11,5 +11,6 @@
   for = "/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
-    Content-Security-Policy = "frame-ancestors 'self' https://discord.com https://*.discord.com"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "*"
+    Content-Security-Policy = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://discord.com https://*.discord.com https://*.discordapp.com data: blob:; frame-ancestors 'self' https://discord.com https://*.discord.com; img-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'"
