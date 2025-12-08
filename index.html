@@ -6,8 +6,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <!-- Allow iframe embedding for Discord -->
-  <meta http-equiv="Content-Security-Policy" content="frame-ancestors 'self' https://discord.com https://*.discord.com;">
   <title>Aliens vs Goju</title>
   <link rel="stylesheet" href="/style.css">
   <style>
@@ -465,39 +463,11 @@
   <script type="module" src="./main.js?v=5"></script>
   
   <!-- Game scripts loaded with defer to ensure DOM is ready -->
-  <script defer src="/game.v2.js?v=20241207-5"></script>
+  <script defer src="/game.main.js?v=20241207-6"></script>
   <script defer src="/animations/player-animations.js?v=5"></script>
   <script defer src="/animations/enemy-animations.js?v=5"></script>
   <script defer src="/animations/golem-animations.js?v=5"></script>
   <script defer src="/animations/redalien-animations.js?v=5"></script>
-  <script defer src="/debug-controls.js?v=5"></script>
-    
-    const enemySpeedSlider = document.getElementById('enemySpeedSlider');
-    const enemySpeedValue = document.getElementById('enemySpeedValue');
-    const enemySpeedPercent = document.getElementById('enemySpeedPercent');
-    const enemySpeedInc = document.getElementById('enemySpeedInc');
-    const enemySpeedDec = document.getElementById('enemySpeedDec');
-    
-    function updateEnemySpeed(speed){
-      window.ENEMY_BASE_SPEED = parseInt(speed);
-      enemySpeedValue.textContent = speed;
-      enemySpeedSlider.value = speed;
-      const percent = Math.round((speed / 220) * 100);
-      enemySpeedPercent.textContent = percent + '%';
-      
-      // Update existing enemies
-      if(window.enemies){
-        window.enemies.forEach(e => {
-          e.speed = window.ENEMY_BASE_SPEED;
-        });
-      }
-      console.log('Enemy speed updated to:', speed);
-    }
-    
-    if(enemySpeedSlider){
-      enemySpeedSlider.addEventListener('input', (e) => {
-        updateEnemySpeed(e.target.value);
-      });
-    }
+  <script defer src="/debug-controls.js?v=6"></script>
 </body>
 </html>
