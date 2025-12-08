@@ -12,5 +12,4 @@
   [headers.values]
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
-    X-Frame-Options = "ALLOW-FROM https://discord.com"
     Content-Security-Policy = "frame-ancestors 'self' https://discord.com https://*.discord.com"
