@@ -149,6 +149,13 @@ document.addEventListener('DOMContentLoaded', () => {
       logToLobbyDebug('Co-op clicked! 🎮');
       
       try {
+        // Ensure NetworkManager is loaded
+        if (!window.networkManager) {
+          console.error('❌ NetworkManager not loaded!');
+          logToLobbyDebug('❌ NetworkManager not loaded!');
+          return;
+        }
+        
         // Initialize network manager if not already
         if (!window.networkManager.peer) {
           logToLobbyDebug('🔌 Initializing PeerJS...');
@@ -245,6 +252,15 @@ document.addEventListener('DOMContentLoaded', () => {
         joinError.textContent = '🔄 Connecting...';
         joinError.style.color = '#2196F3';
         
+        // Ensure NetworkManager is loaded
+        if (!window.networkManager) {
+          console.error('❌ NetworkManager not loaded!');
+          joinError.textContent = '❌ NetworkManager not loaded';
+          joinError.style.color = '#f44336';
+          logToLobbyDebug('❌ NetworkManager not loaded!');
+          return;
+        }
+        
         // Initialize network manager if not already
         if (!window.networkManager.peer) {
           logToLobbyDebug('🔌 Initializing PeerJS...');
@@ -330,9 +346,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const copyBtn = document.getElementById('copyLobbyCode');
   if (copyBtn) {
     copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(lobbyState.code).then(() => {
+      const codeInput = document.getElementById('lobbyCodeDisplay');
+      const codeToCopy = lobbyState.code || (codeInput ? codeInput.value : '');
+      
+      if (!codeToCopy || codeToCopy === 'XXXX') {
+        copyBtn.textContent = '❌ No code';
+        setTimeout(() => copyBtn.textContent = '📋 Copy', 2000);
+        return;
+      }
+      
+      navigator.clipboard.writeText(codeToCopy).then(() => {
         copyBtn.textContent = '✅ Copied!';
         setTimeout(() => copyBtn.textContent = '📋 Copy', 2000);
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+        // Fallback: select the text
+        if (codeInput) {
+          codeInput.select();
+          document.execCommand('copy');
+          copyBtn.textContent = '✅ Copied!';
+          setTimeout(() => copyBtn.textContent = '📋 Copy', 2000);
+        }
       });
     });
   }
@@ -341,13 +375,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const shareBtn = document.getElementById('shareLobbyCode');
   if (shareBtn) {
     shareBtn.addEventListener('click', () => {
-      const shareText = `Join my Aliens vs Goju co-op game! Code: ${lobbyState.code}`;
-      if (navigator.share) {
-        navigator.share({ text: shareText });
-      } else {
-        navigator.clipboard.writeText(shareText);
-        shareBtn.textContent = '✅ Copied!';
+      const codeInput = document.getElementById('lobbyCodeDisplay');
+      const codeToShare = lobbyState.code || (codeInput ? codeInput.value : '');
+      
+      if (!codeToShare || codeToShare === 'XXXX') {
+        shareBtn.textContent = '❌ No code';
         setTimeout(() => shareBtn.textContent = '🔗 Share', 2000);
+        return;
+      }
+      
+      const shareText = `Join my Aliens vs Goju co-op game! Code: ${codeToShare}`;
+      if (navigator.share) {
+        navigator.share({ text: shareText }).catch(err => {
+          console.log('Share cancelled or failed:', err);
+        });
+      } else {
+        navigator.clipboard.writeText(shareText).then(() => {
+          shareBtn.textContent = '✅ Copied!';
+          setTimeout(() => shareBtn.textContent = '🔗 Share', 2000);
+        }).catch(err => {
+          console.error('Failed to copy share text:', err);
+        });
       }
     });
   }

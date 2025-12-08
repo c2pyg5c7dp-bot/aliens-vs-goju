@@ -197,6 +197,18 @@ class NetworkManager {
             players: Array.from(this.players.entries()),
             roomCode: this.roomCode
           });
+          
+          // Send current game state if game is in progress (late join)
+          if (this.onRequestGameState) {
+            const gameState = this.onRequestGameState();
+            if (gameState && gameState.inProgress) {
+              console.log('📤 Sending game state to late joiner:', data.name);
+              conn.send({
+                type: 'gameStateSnapshot',
+                gameState: gameState
+              });
+            }
+          }
 
           // Notify all other players
           this.broadcast({
@@ -342,6 +354,14 @@ class NetworkManager {
           this.onEnemyKilled(data.enemyId, data.playerId);
         }
         break;
+
+      case 'gameStateSnapshot':
+        // Received full game state (late join)
+        console.log('📥 Received game state snapshot for late join');
+        if (this.onGameStateSnapshot) {
+          this.onGameStateSnapshot(data.gameState);
+        }
+        break;
     }
   }
 
@@ -389,6 +409,8 @@ class NetworkManager {
 
   // Send character selection
   selectCharacter(character) {
+    if (!this.peer || !this.peer.open) return;
+    
     const message = {
       type: 'characterSelect',
       playerId: this.localPlayerId,
@@ -402,10 +424,15 @@ class NetworkManager {
     }
   }
 
-  // Start game (host only)
+  // Start the game (host only)
   startGame() {
     if (!this.isHost) {
-      console.warn('⚠️ Only host can start the game!');
+      console.warn('⚠️ Only host can start game');
+      return;
+    }
+    
+    if (!this.peer || !this.peer.open) {
+      console.error('❌ Peer not connected');
       return;
     }
 
@@ -429,10 +456,13 @@ class NetworkManager {
 
   // Send game state updates
   sendGameState(playerData) {
+    if (!this.peer || !this.peer.open) return;
+    
     const message = {
       type: 'gameState',
       playerId: this.localPlayerId,
       position: playerData.position,
+      velocity: playerData.velocity,
       health: playerData.health,
       score: playerData.score,
       timestamp: Date.now()
@@ -447,6 +477,8 @@ class NetworkManager {
 
   // Update player stats
   updatePlayer(updates) {
+    if (!this.peer || !this.peer.open) return;
+    
     const message = {
       type: 'playerUpdate',
       playerId: this.localPlayerId,
@@ -462,7 +494,7 @@ class NetworkManager {
 
   // Broadcast wave spawn (host only)
   broadcastWaveSpawn(waveNum, enemies) {
-    if (!this.isHost) return;
+    if (!this.isHost || !this.peer || !this.peer.open) return;
 
     const message = {
       type: 'spawnWave',
@@ -485,7 +517,7 @@ class NetworkManager {
 
   // Broadcast powerup spawn (host only)
   broadcastPowerupSpawn(powerup) {
-    if (!this.isHost) return;
+    if (!this.isHost || !this.peer || !this.peer.open) return;
 
     const message = {
       type: 'spawnPowerup',
@@ -503,6 +535,8 @@ class NetworkManager {
 
   // Broadcast powerup collection
   broadcastPowerupCollect(powerupId, playerId) {
+    if (!this.peer || !this.peer.open) return;
+    
     const message = {
       type: 'collectPowerup',
       powerupId: powerupId,
@@ -518,6 +552,8 @@ class NetworkManager {
 
   // Broadcast projectile spawn
   broadcastProjectileSpawn(projectile) {
+    if (!this.peer || !this.peer.open) return;
+    
     const message = {
       type: 'spawnProjectile',
       projectile: {
@@ -541,6 +577,8 @@ class NetworkManager {
 
   // Broadcast enemy damage (for kill stealing prevention)
   broadcastEnemyDamage(enemyId, damage) {
+    if (!this.peer || !this.peer.open) return;
+    
     const message = {
       type: 'enemyDamage',
       enemyId: enemyId,
@@ -557,7 +595,7 @@ class NetworkManager {
 
   // Broadcast enemy killed (host only)
   broadcastEnemyKilled(enemyId, killerId) {
-    if (!this.isHost) return;
+    if (!this.isHost || !this.peer || !this.peer.open) return;
 
     const message = {
       type: 'enemyKilled',

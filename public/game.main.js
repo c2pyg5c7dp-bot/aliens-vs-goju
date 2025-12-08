@@ -149,7 +149,104 @@ function savePermanentUpgrades() {
 loadPermanentUpgrades();
 
 // Multiplayer player tracking
-let multiplayerPlayers = []; // Array of {id, name, score, character, position, health}
+let multiplayerPlayers = []; // Array of {id, name, score, character, position, health, vx, vy, animController}
+
+// Helper to create animation controller for a player
+function createPlayerAnimController() {
+  if (!window.playerAnimController || !window.playerAnimController.enabled) {
+    return null; // Animation system not loaded yet
+  }
+  
+  // Create a clone of the animation controller for this player
+  const controller = {
+    frameIndex: 0,
+    frameTimer: 0,
+    frameDuration: 0.1,
+    currentDirection: 'south',
+    animType: 'idle'
+  };
+  
+  return controller;
+}
+
+// Helper to update multiplayer player animation
+function updateMultiplayerAnimation(controller, dt, vx, vy) {
+  if (!controller) return;
+  
+  // Determine animation type
+  if (vx !== 0 || vy !== 0) {
+    controller.animType = 'running-8-frames';
+  } else {
+    controller.animType = 'idle';
+  }
+  
+  // Determine direction based on velocity
+  if (vx !== 0 || vy !== 0) {
+    const angle = Math.atan2(vy, vx);
+    const deg = angle * 180 / Math.PI;
+    const normalized = (deg + 360) % 360;
+    
+    // 8 directions
+    if (normalized >= 337.5 || normalized < 22.5) controller.currentDirection = 'east';
+    else if (normalized >= 22.5 && normalized < 67.5) controller.currentDirection = 'south-east';
+    else if (normalized >= 67.5 && normalized < 112.5) controller.currentDirection = 'south';
+    else if (normalized >= 112.5 && normalized < 157.5) controller.currentDirection = 'south-west';
+    else if (normalized >= 157.5 && normalized < 202.5) controller.currentDirection = 'west';
+    else if (normalized >= 202.5 && normalized < 247.5) controller.currentDirection = 'north-west';
+    else if (normalized >= 247.5 && normalized < 292.5) controller.currentDirection = 'north';
+    else controller.currentDirection = 'north-east';
+  }
+  
+  // Advance frame timer
+  controller.frameTimer += dt;
+  if (controller.frameTimer >= controller.frameDuration) {
+    controller.frameTimer -= controller.frameDuration;
+    
+    // Get sprite data
+    const key = controller.animType === 'idle' ? `running-8-frames_${controller.currentDirection}` : `${controller.animType}_${controller.currentDirection}`;
+    const sprite = window.playerAnimController.sprites[key];
+    
+    if (sprite && sprite.frames) {
+      controller.frameIndex = (controller.frameIndex + 1) % sprite.frames.length;
+    }
+  }
+}
+
+// Helper to draw multiplayer player sprite
+function drawMultiplayerPlayerSprite(ctx, mp) {
+  if (!mp.animController || !window.playerAnimController || !window.playerAnimController.enabled) {
+    return false; // Fallback to circle rendering
+  }
+  
+  try {
+    const key = mp.animController.animType === 'idle' 
+      ? `running-8-frames_${mp.animController.currentDirection}` 
+      : `${mp.animController.animType}_${mp.animController.currentDirection}`;
+    
+    const sprite = window.playerAnimController.sprites[key];
+    
+    if (!sprite || !sprite.loaded || !sprite.frames || !sprite.frames[mp.animController.frameIndex]) {
+      return false;
+    }
+    
+    const img = sprite.frames[mp.animController.frameIndex];
+    if (!img.complete) return false;
+    
+    const fw = sprite.frameW;
+    const fh = sprite.frameH;
+    
+    ctx.save();
+    ctx.translate(mp.x, mp.y);
+    ctx.drawImage(img, -fw/2, -fh/2, fw, fh);
+    ctx.restore();
+    
+    return true;
+  } catch (e) {
+    console.warn('Failed to draw multiplayer player sprite:', e);
+    return false;
+  }
+}
+
 function updateMultiplayerScore(playerId, playerName, playerScore, playerCharacter) {
   const existing = multiplayerPlayers.find(p => p.id === playerId);
   if (existing) {
@@ -157,7 +254,19 @@ function updateMultiplayerScore(playerId, playerName, playerScore, playerCharact
     existing.name = playerName;
     existing.character = playerCharacter;
   } else {
-    multiplayerPlayers.push({ id: playerId, name: playerName, score: playerScore, character: playerCharacter, x: 0, y: 0, health: 0 });
+    const newPlayer = { 
+      id: playerId, 
+      name: playerName, 
+      score: playerScore, 
+      character: playerCharacter, 
+      x: 0, 
+      y: 0, 
+      health: 0,
+      vx: 0,
+      vy: 0,
+      animController: createPlayerAnimController()
+    };
+    multiplayerPlayers.push(newPlayer);
   }
 }
 
@@ -171,6 +280,7 @@ function sendGameState() {
   
   window.networkManager.sendGameState({
     position: { x: player.x, y: player.y },
+    velocity: { vx: player.vx, vy: player.vy },
     health: player.health,
     score: score
   });
@@ -180,11 +290,20 @@ function sendGameState() {
 function handleGameStateUpdate(data) {
   if (!data || !data.playerId) return;
   
+  // Track last update time for ping calculation
+  if (window.networkManager) {
+    window.networkManager._lastUpdateTime = Date.now();
+  }
+  
   const p = multiplayerPlayers.find(player => player.id === data.playerId);
   if (p) {
     if (data.position) {
       p.x = data.position.x;
       p.y = data.position.y;
+    }
+    if (data.velocity) {
+      p.vx = data.velocity.vx || 0;
+      p.vy = data.velocity.vy || 0;
     }
     if (data.health !== undefined) p.health = data.health;
     if (data.score !== undefined) p.score = data.score;
@@ -266,6 +385,114 @@ if (window.networkManager) {
       enemies.splice(idx, 1);
       console.log(`💀 Enemy ${enemyId} killed by ${killerId}`);
     }
+  };
+  
+  // Handle request for game state (late join)
+  window.networkManager.onRequestGameState = () => {
+    console.log('📤 Collecting game state for late joiner');
+    return {
+      waveNumber: waveNumber,
+      enemies: enemies.map(e => ({
+        id: e.id,
+        x: e.x,
+        y: e.y,
+        hp: e.hp,
+        maxHp: e.maxHp,
+        type: e.type || 'default'
+      })),
+      powerups: powerups.map(p => ({
+        id: p.id,
+        x: p.x,
+        y: p.y,
+        type: p.type
+      })),
+      projectiles: projectiles.map(p => ({
+        id: p.id,
+        x: p.x,
+        y: p.y,
+        vx: p.vx,
+        vy: p.vy,
+        type: p.type,
+        damage: p.damage
+      })),
+      players: Object.fromEntries(
+        Object.entries(players).map(([id, p]) => [id, {
+          x: p.x,
+          y: p.y,
+          hp: p.hp,
+          score: p.score,
+          color: p.color
+        }])
+      )
+    };
+  };
+  
+  // Handle received game state snapshot (late join)
+  window.networkManager.onGameStateSnapshot = (gameState) => {
+    console.log('📥 Restoring game state from snapshot', gameState);
+    
+    // Restore wave number
+    waveNumber = gameState.waveNumber || 0;
+    
+    // Clear and restore enemies
+    enemies.length = 0;
+    if (gameState.enemies) {
+      gameState.enemies.forEach(eData => {
+        const enemy = new Enemy(eData.x, eData.y, eData.type);
+        enemy.id = eData.id;
+        enemy.hp = eData.hp;
+        enemy.maxHp = eData.maxHp;
+        enemies.push(enemy);
+      });
+    }
+    
+    // Clear and restore powerups
+    powerups.length = 0;
+    if (gameState.powerups) {
+      gameState.powerups.forEach(pData => {
+        const powerup = new PowerUp(pData.x, pData.y, pData.type);
+        powerup.id = pData.id;
+        powerups.push(powerup);
+      });
+    }
+    
+    // Clear and restore projectiles
+    projectiles.length = 0;
+    if (gameState.projectiles) {
+      gameState.projectiles.forEach(projData => {
+        const proj = new Projectile(
+          projData.x, projData.y, 
+          projData.vx, projData.vy, 
+          projData.type, projData.damage, 
+          projData.id
+        );
+        projectiles.push(proj);
+      });
+    }
+    
+    // Restore other player states
+    if (gameState.players) {
+      Object.entries(gameState.players).forEach(([id, pData]) => {
+        if (id !== window.networkManager.localPlayerId) {
+          if (!players[id]) {
+            players[id] = {
+              x: pData.x,
+              y: pData.y,
+              hp: pData.hp,
+              score: pData.score,
+              color: pData.color || '#00ff00'
+            };
+          } else {
+            players[id].x = pData.x;
+            players[id].y = pData.y;
+            players[id].hp = pData.hp;
+            players[id].score = pData.score;
+          }
+        }
+      });
+    }
+    
+    console.log(`✅ Game state restored: Wave ${waveNumber}, ${enemies.length} enemies, ${powerups.length} powerups`);
   };
 }
 
@@ -1595,6 +1822,10 @@ function update(dt){
   }
   player.x = Math.max(player.radius, Math.min(W - player.radius, player.x + vx * dt));
   player.y = Math.max(player.radius, Math.min(H - player.radius, player.y + vy * dt));
+  
+  // Store velocity on player object for network sync
+  player.vx = vx;
+  player.vy = vy;
 
   // Update player animation controller
   try{
@@ -1603,6 +1834,18 @@ function update(dt){
       window.playerAnimController.update(dt, vx, vy, isFiring);
     }
   }catch(e){}
+  
+  // Update multiplayer player animations
+  if (window.isCoopMode && window.playerAnimController && window.playerAnimController.enabled) {
+    multiplayerPlayers.forEach(mp => {
+      if (!mp.animController) {
+        mp.animController = createPlayerAnimController();
+      }
+      if (mp.animController) {
+        updateMultiplayerAnimation(mp.animController, dt, mp.vx || 0, mp.vy || 0);
+      }
+    });
+  }
 
   // Update sword swing if sword is active
   if(player.weapon === 'sword'){
@@ -2473,27 +2716,32 @@ function draw(){
     multiplayerPlayers.forEach(mp => {
       if (!mp.x || !mp.y) return; // Skip if no position data yet
       
-      // Draw player as colored circle with name
-      const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0'];
-      const colorIndex = Math.abs(mp.id.charCodeAt(0)) % colors.length;
+      // Try to draw sprite first, fallback to circle if sprite not available
+      const drewSprite = drawMultiplayerPlayerSprite(ctx, mp);
       
-      // Player circle
-      ctx.fillStyle = colors[colorIndex];
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(mp.x, mp.y, 20, 0, Math.PI*2);
-      ctx.fill();
-      ctx.stroke();
+      if (!drewSprite) {
+        // Fallback: Draw player as colored circle with name
+        const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0'];
+        const colorIndex = Math.abs(mp.id.charCodeAt(0)) % colors.length;
+        
+        // Player circle
+        ctx.fillStyle = colors[colorIndex];
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(mp.x, mp.y, 20, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+      }
       
-      // Player name
+      // Player name (always draw above sprite or circle)
       ctx.fillStyle = '#fff';
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 2;
       ctx.font = 'bold 12px Arial';
       ctx.textAlign = 'center';
-      ctx.strokeText(mp.name || 'Player', mp.x, mp.y - 30);
-      ctx.fillText(mp.name || 'Player', mp.x, mp.y - 30);
+      ctx.strokeText(mp.name || 'Player', mp.x, mp.y - 40);
+      ctx.fillText(mp.name || 'Player', mp.x, mp.y - 40);
       
       // Health bar
       if (mp.health > 0) {
@@ -2502,10 +2750,10 @@ function draw(){
         const healthPercent = Math.max(0, Math.min(1, mp.health / 20)); // Assume max 20 health
         
         ctx.fillStyle = '#333';
-        ctx.fillRect(mp.x - barWidth/2, mp.y + 25, barWidth, barHeight);
+        ctx.fillRect(mp.x - barWidth/2, mp.y + 35, barWidth, barHeight);
         
         ctx.fillStyle = healthPercent > 0.5 ? '#4CAF50' : healthPercent > 0.25 ? '#FFC107' : '#F44336';
-        ctx.fillRect(mp.x - barWidth/2, mp.y + 25, barWidth * healthPercent, barHeight);
+        ctx.fillRect(mp.x - barWidth/2, mp.y + 35, barWidth * healthPercent, barHeight);
       }
     });
   }
@@ -2765,6 +3013,80 @@ function draw(){
     });
     
     // Reset text alignment
+    ctx.textAlign = 'center';
+  }
+
+  // Draw connection status indicator in co-op mode
+  if (window.isCoopMode && window.networkManager) {
+    const statusX = W - 45;
+    const statusY = 15;
+    const statusSize = 12;
+    
+    // Determine connection status
+    let statusColor = '#4CAF50'; // Green = connected
+    let statusText = 'Connected';
+    let pingText = '';
+    
+    const hasPeer = window.networkManager.peer && window.networkManager.peer.open;
+    const hasConnection = window.networkManager.conn && window.networkManager.conn.open;
+    
+    if (!hasPeer) {
+      statusColor = '#F44336'; // Red = disconnected
+      statusText = 'Disconnected';
+    } else if (window.networkManager.isHost) {
+      const connectedCount = (window.networkManager.connections && window.networkManager.connections.length) || 0;
+      statusText = `Host (${connectedCount})`;
+      pingText = `${connectedCount} players`;
+    } else if (!hasConnection) {
+      statusColor = '#FFC107'; // Yellow = connecting
+      statusText = 'Connecting...';
+    } else {
+      statusText = 'Client';
+      // Calculate approximate ping based on last update time
+      if (window.networkManager._lastUpdateTime) {
+        const timeSinceUpdate = Date.now() - window.networkManager._lastUpdateTime;
+        if (timeSinceUpdate > 3000) {
+          statusColor = '#FFC107'; // Yellow = lagging
+          pingText = 'Lagging';
+        } else {
+          pingText = `${Math.round(timeSinceUpdate / 10)}ms`;
+        }
+      }
+    }
+    
+    // Draw status dot
+    ctx.fillStyle = statusColor;
+    ctx.beginPath();
+    ctx.arc(statusX, statusY, statusSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Add pulse effect for connected status
+    if (statusColor === '#4CAF50') {
+      const pulseSize = statusSize / 2 + Math.sin(Date.now() / 300) * 2;
+      ctx.strokeStyle = statusColor;
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(statusX, statusY, pulseSize, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    
+    // Draw tooltip on hover (always show for now)
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    const tooltipWidth = 100;
+    const tooltipHeight = pingText ? 30 : 20;
+    ctx.fillRect(statusX - tooltipWidth - 10, statusY - 8, tooltipWidth, tooltipHeight);
+    
+    ctx.fillStyle = statusColor;
+    ctx.fillText(statusText, statusX - 15, statusY + 4);
+    if (pingText) {
+      ctx.fillStyle = '#ccc';
+      ctx.fillText(pingText, statusX - 15, statusY + 16);
+    }
+    
     ctx.textAlign = 'center';
   }
 
