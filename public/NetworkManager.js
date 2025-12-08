@@ -1,36 +1,56 @@
-// NetworkManager.js - Handles P2P multiplayer using PeerJS
+/**
+ * NetworkManager.js - P2P Multiplayer Manager using PeerJS
+ * Handles room creation, joining, and all network communication for co-op gameplay
+ */
+
 console.log('🌐 NetworkManager.js loading...');
 
 class NetworkManager {
   constructor() {
+    // Core networking
     this.peer = null;
     this.conn = null;
-    this.connections = []; // Array of connections for host
+    this.connections = [];
+    this.localPlayerId = null;
+    
+    // Room state
     this.isHost = false;
     this.roomCode = null;
-    this.players = new Map(); // peerId -> {name, character, score, position, health}
-    this.localPlayerId = null;
+    this.roomMetadata = null;
     this.maxPlayers = 4;
     
-    // Callbacks
+    // Player tracking
+    this.players = new Map();
+    
+    // Event callbacks
     this.onPlayerJoined = null;
     this.onPlayerLeft = null;
     this.onGameStateUpdate = null;
     this.onStartGame = null;
+    this.onSpawnWave = null;
+    this.onSpawnPowerup = null;
+    this.onCollectPowerup = null;
+    this.onSpawnProjectile = null;
+    this.onEnemyDamage = null;
+    this.onEnemyKilled = null;
+    this.onRequestGameState = null;
+    this.onGameStateSnapshot = null;
   }
 
-  // Initialize PeerJS connection
+  /**
+   * Initialize PeerJS connection
+   * @returns {Promise<string>} Resolves with peer ID
+   */
   init() {
     return new Promise((resolve, reject) => {
+      if (typeof Peer === 'undefined') {
+        const error = new Error('PeerJS library not loaded. Please refresh the page.');
+        console.error('❌', error.message);
+        reject(error);
+        return;
+      }
+
       try {
-        // Check if Peer is available
-        if (typeof Peer === 'undefined') {
-          console.error('❌ PeerJS library not loaded!');
-          reject(new Error('PeerJS library not loaded. Please refresh the page.'));
-          return;
-        }
-        
-        // Create peer with a random ID
         this.peer = new Peer({
           config: {
             iceServers: [
@@ -41,8 +61,8 @@ class NetworkManager {
         });
 
         this.peer.on('open', (id) => {
-          console.log('✅ PeerJS connected! ID:', id);
           this.localPlayerId = id;
+          console.log('✅ PeerJS connected! ID:', id);
           resolve(id);
         });
 
@@ -51,12 +71,10 @@ class NetworkManager {
           reject(err);
         });
 
-        // Handle incoming connections (for both host and clients)
         this.peer.on('connection', (conn) => {
           console.log('📞 Incoming connection from:', conn.peer);
           this.handleConnection(conn);
         });
-
       } catch (error) {
         console.error('❌ Failed to initialize PeerJS:', error);
         reject(error);
@@ -64,7 +82,10 @@ class NetworkManager {
     });
   }
 
-  // Create a new room (host)
+  /**
+   * Create a new multiplayer room (host)
+   * @returns {string|null} Room code or null if failed
+   */
   createRoom() {
     if (!this.peer) {
       console.error('❌ Peer not initialized!');
@@ -74,11 +95,7 @@ class NetworkManager {
     this.isHost = true;
     this.roomCode = this.generateRoomCode();
     
-    console.log('🎮 Room created! Code:', this.roomCode);
-    console.log('🔑 Host Peer ID:', this.localPlayerId);
-    
-    // Store room code -> peer ID mapping in localStorage for THIS HOST only
-    // This helps the host remember their own room
+    // Store room mapping locally
     const myRooms = JSON.parse(localStorage.getItem('myRooms') || '{}');
     myRooms[this.roomCode] = {
       hostId: this.localPlayerId,
@@ -86,18 +103,21 @@ class NetworkManager {
     };
     localStorage.setItem('myRooms', JSON.stringify(myRooms));
     
-    // Store the reverse mapping: roomCode is encoded in the peer ID metadata
-    // We'll use the room code as a prefix for discovery
     this.roomMetadata = {
       roomCode: this.roomCode,
       isHost: true,
       hostPeerId: this.localPlayerId
     };
     
+    console.log('🎮 Room created! Code:', this.roomCode, '| Peer ID:', this.localPlayerId);
     return this.roomCode;
   }
 
-  // Join an existing room (client)
+  /**
+   * Join an existing room (client)
+   * @param {string} roomCode - The room code to join
+   * @returns {Promise<boolean>} Success status
+   */
   async joinRoom(roomCode) {
     if (!this.peer) {
       console.error('❌ Peer not initialized!');
@@ -106,46 +126,38 @@ class NetworkManager {
 
     this.roomCode = roomCode.toUpperCase();
     
-    // First check if the host is on this same browser (for testing)
+    // Check for room in local storage (same browser testing)
     const myRooms = JSON.parse(localStorage.getItem('myRooms') || '{}');
     let hostId = myRooms[this.roomCode]?.hostId;
     
-    if (hostId) {
-      console.log('🔍 Found room in local storage (same browser)');
-    } else {
-      // For cross-browser/cross-device: derive host peer ID from room code
-      // This is a simple encoding - in production you'd use a database
-      // For now, we'll try to connect using the room code as a peer ID pattern
-      console.log('🔍 Looking for remote host with room code:', this.roomCode);
-      
-      // Check localStorage for shared room codes (set by host via share mechanism)
+    // Check shared room codes (cross-device)
+    if (!hostId) {
       const sharedRooms = JSON.parse(localStorage.getItem('sharedRoomCodes') || '{}');
-      if (sharedRooms[this.roomCode]) {
-        hostId = sharedRooms[this.roomCode];
-        console.log('🔍 Found shared room code mapping:', hostId);
-      }
+      hostId = sharedRooms[this.roomCode];
     }
     
     if (!hostId) {
       console.error('❌ Room not found:', this.roomCode);
-      console.log('💡 Make sure the host has shared the room code and you\'ve received the host peer ID');
-      console.log('💡 Room codes only work on the same browser for now. Use direct peer ID connection for cross-device.');
       return false;
     }
 
     console.log('🔗 Joining room:', this.roomCode, '| Host ID:', hostId);
 
     try {
-      // Connect to host
       const conn = this.peer.connect(hostId, { reliable: true });
       
       return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          if (!this.conn) {
+            reject(new Error('Connection timeout'));
+          }
+        }, 10000);
+
         conn.on('open', () => {
-          console.log('✅ Connected to host!');
+          clearTimeout(timeout);
           this.conn = conn;
           this.isHost = false;
           
-          // Send join request
           this.sendToHost({
             type: 'join',
             playerId: this.localPlayerId,
@@ -153,20 +165,15 @@ class NetworkManager {
           });
           
           this.handleConnection(conn);
+          console.log('✅ Connected to host!');
           resolve(true);
         });
 
         conn.on('error', (err) => {
+          clearTimeout(timeout);
           console.error('❌ Connection error:', err);
           reject(err);
         });
-
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          if (!this.conn) {
-            reject(new Error('Connection timeout'));
-          }
-        }, 10000);
       });
     } catch (error) {
       console.error('❌ Failed to join room:', error);
@@ -174,238 +181,36 @@ class NetworkManager {
     }
   }
 
-  // Handle incoming connections
+  /**
+   * Handle incoming peer connection
+   * @param {DataConnection} conn - PeerJS connection object
+   */
   handleConnection(conn) {
     console.log('🔌 Setting up connection with:', conn.peer);
 
-    conn.on('data', (data) => {
-      this.handleMessage(data, conn);
-    });
+    conn.on('data', (data) => this.handleMessage(data, conn));
+    conn.on('close', () => this.handlePlayerDisconnect(conn.peer));
+    conn.on('error', (err) => console.error('❌ Connection error:', err));
 
-    conn.on('close', () => {
-      console.log('❌ Connection closed:', conn.peer);
-      this.handlePlayerDisconnect(conn.peer);
-    });
-
-    conn.on('error', (err) => {
-      console.error('❌ Connection error:', err);
-    });
-
-    // If host, add to connections list
     if (this.isHost) {
       this.connections.push(conn);
       console.log('👥 Total connections:', this.connections.length);
     }
   }
 
-  // Handle incoming messages
-  handleMessage(data, conn) {
-    console.log('📨 Received:', data.type, 'from', conn.peer);
-
-    switch (data.type) {
-      case 'join':
-        if (this.isHost) {
-          // Check if room is full
-          if (this.connections.length >= this.maxPlayers) {
-            conn.send({ type: 'error', message: 'Room is full' });
-            conn.close();
-            return;
-          }
-
-          // Add player
-          this.players.set(data.playerId, {
-            name: data.name,
-            character: null,
-            score: 0,
-            position: { x: 0, y: 0 },
-            health: 0
-          });
-
-          console.log('✅ Player joined:', data.name);
-
-          // Send current room state to new player
-          conn.send({
-            type: 'roomState',
-            players: Array.from(this.players.entries()),
-            roomCode: this.roomCode
-          });
-          
-          // Send current game state if game is in progress (late join)
-          if (this.onRequestGameState) {
-            const gameState = this.onRequestGameState();
-            if (gameState && gameState.inProgress) {
-              console.log('📤 Sending game state to late joiner:', data.name);
-              conn.send({
-                type: 'gameStateSnapshot',
-                gameState: gameState
-              });
-            }
-          }
-
-          // Notify all other players
-          this.broadcast({
-            type: 'playerJoined',
-            playerId: data.playerId,
-            name: data.name
-          }, conn);
-
-          if (this.onPlayerJoined) {
-            this.onPlayerJoined(data.playerId, data.name);
-          }
-        }
-        break;
-
-      case 'roomState':
-        // Client receives initial room state
-        console.log('📊 Room state received:', data.players.length, 'players');
-        data.players.forEach(([id, player]) => {
-          this.players.set(id, player);
-        });
-        if (this.onPlayerJoined) {
-          data.players.forEach(([id, player]) => {
-            this.onPlayerJoined(id, player.name);
-          });
-        }
-        break;
-
-      case 'playerJoined':
-        console.log('👋 New player joined:', data.name);
-        this.players.set(data.playerId, {
-          name: data.name,
-          character: null,
-          score: 0
-        });
-        if (this.onPlayerJoined) {
-          this.onPlayerJoined(data.playerId, data.name);
-        }
-        break;
-
-      case 'playerLeft':
-        console.log('👋 Player left:', data.playerId);
-        this.players.delete(data.playerId);
-        if (this.onPlayerLeft) {
-          this.onPlayerLeft(data.playerId);
-        }
-        break;
-
-      case 'characterSelect':
-        console.log('🎭 Player selected character:', data.character);
-        const player = this.players.get(data.playerId);
-        if (player) {
-          player.character = data.character;
-        }
-        // Broadcast to others if host
-        if (this.isHost) {
-          this.broadcast(data, conn);
-        }
-        break;
-
-      case 'startGame':
-        console.log('🎮 Game starting!');
-        if (this.onStartGame) {
-          this.onStartGame(data.players);
-        }
-        break;
-
-      case 'gameState':
-        // Sync game state (position, health, score, etc.)
-        if (this.onGameStateUpdate) {
-          this.onGameStateUpdate(data);
-        }
-        // If host, relay to all other clients
-        if (this.isHost) {
-          this.broadcast(data, conn);
-        }
-        break;
-
-      case 'playerUpdate':
-        // Update specific player data
-        const p = this.players.get(data.playerId);
-        if (p) {
-          Object.assign(p, data.updates);
-        }
-        // Broadcast if host
-        if (this.isHost) {
-          this.broadcast(data, conn);
-        }
-        break;
-
-      case 'spawnEnemy':
-        // Host spawned an enemy - clients create it locally
-        if (this.onSpawnEnemy) {
-          this.onSpawnEnemy(data.enemy);
-        }
-        break;
-
-      case 'spawnWave':
-        // Host starting a new wave
-        if (this.onSpawnWave) {
-          this.onSpawnWave(data.waveNum, data.enemies);
-        }
-        break;
-
-      case 'spawnPowerup':
-        // Host spawned a powerup
-        if (this.onSpawnPowerup) {
-          this.onSpawnPowerup(data.powerup);
-        }
-        break;
-
-      case 'collectPowerup':
-        // Someone collected a powerup
-        if (this.onCollectPowerup) {
-          this.onCollectPowerup(data.powerupId, data.playerId);
-        }
-        break;
-
-      case 'spawnProjectile':
-        // Player fired a projectile
-        if (this.onSpawnProjectile) {
-          this.onSpawnProjectile(data.projectile);
-        }
-        // Broadcast if host
-        if (this.isHost) {
-          this.broadcast(data, conn);
-        }
-        break;
-
-      case 'enemyDamage':
-        // Enemy took damage
-        if (this.onEnemyDamage) {
-          this.onEnemyDamage(data.enemyId, data.damage, data.playerId);
-        }
-        // Broadcast if host
-        if (this.isHost) {
-          this.broadcast(data, conn);
-        }
-        break;
-
-      case 'enemyKilled':
-        // Enemy was killed
-        if (this.onEnemyKilled) {
-          this.onEnemyKilled(data.enemyId, data.playerId);
-        }
-        break;
-
-      case 'gameStateSnapshot':
-        // Received full game state (late join)
-        console.log('📥 Received game state snapshot for late join');
-        if (this.onGameStateSnapshot) {
-          this.onGameStateSnapshot(data.gameState);
-        }
-        break;
-    }
-  }
-
-  // Handle player disconnect
+  /**
+   * Handle player disconnect
+   * @param {string} peerId - Disconnected peer ID
+   */
   handlePlayerDisconnect(peerId) {
+    console.log('❌ Player disconnected:', peerId);
     this.players.delete(peerId);
-    
+
     if (this.isHost) {
       // Remove from connections
       this.connections = this.connections.filter(c => c.peer !== peerId);
       
-      // Notify other players
+      // Notify remaining players
       this.broadcast({
         type: 'playerLeft',
         playerId: peerId
@@ -417,14 +222,235 @@ class NetworkManager {
     }
   }
 
-  // Send message to host (client only)
+  /**
+   * Handle incoming network messages
+   * @param {Object} data - Message data
+   * @param {DataConnection} conn - Source connection
+   */
+  handleMessage(data, conn) {
+    if (!data || !data.type) return;
+    
+    console.log('📨 Received:', data.type, 'from', conn.peer);
+
+    switch (data.type) {
+      case 'join':
+        this.handleJoinRequest(data, conn);
+        break;
+
+      case 'roomState':
+        this.handleRoomState(data);
+        break;
+
+      case 'playerJoined':
+        this.handlePlayerJoined(data);
+        break;
+
+      case 'playerLeft':
+        this.handlePlayerLeft(data);
+        break;
+
+      case 'characterSelect':
+        this.handleCharacterSelect(data, conn);
+        break;
+
+      case 'startGame':
+        this.handleStartGame(data);
+        break;
+
+      case 'gameState':
+        if (this.onGameStateUpdate) {
+          this.onGameStateUpdate(data);
+        }
+        break;
+
+      case 'spawnWave':
+        if (this.onSpawnWave) {
+          this.onSpawnWave(data.waveNum, data.enemies);
+        }
+        break;
+
+      case 'spawnPowerup':
+        if (this.onSpawnPowerup) {
+          this.onSpawnPowerup(data.powerup);
+        }
+        break;
+
+      case 'collectPowerup':
+        if (this.onCollectPowerup) {
+          this.onCollectPowerup(data.powerupId, data.playerId);
+        }
+        if (this.isHost) {
+          this.broadcast(data, conn);
+        }
+        break;
+
+      case 'spawnProjectile':
+        if (this.onSpawnProjectile) {
+          this.onSpawnProjectile(data.projectile);
+        }
+        if (this.isHost) {
+          this.broadcast(data, conn);
+        }
+        break;
+
+      case 'enemyDamage':
+        if (this.onEnemyDamage) {
+          this.onEnemyDamage(data.enemyId, data.damage, data.playerId);
+        }
+        if (this.isHost) {
+          this.broadcast(data, conn);
+        }
+        break;
+
+      case 'enemyKilled':
+        if (this.onEnemyKilled) {
+          this.onEnemyKilled(data.enemyId, data.playerId);
+        }
+        break;
+
+      case 'gameStateSnapshot':
+        if (this.onGameStateSnapshot) {
+          this.onGameStateSnapshot(data.gameState);
+        }
+        break;
+
+      default:
+        console.warn('⚠️ Unknown message type:', data.type);
+    }
+  }
+
+  /**
+   * Handle join request (host only)
+   */
+  handleJoinRequest(data, conn) {
+    if (!this.isHost) return;
+
+    // Check if room is full
+    if (this.connections.length >= this.maxPlayers) {
+      conn.send({ type: 'error', message: 'Room is full' });
+      conn.close();
+      return;
+    }
+
+    // Add player
+    this.players.set(data.playerId, {
+      name: data.name,
+      character: null,
+      score: 0,
+      position: { x: 0, y: 0 },
+      health: 0
+    });
+
+    // Send current room state to new player
+    conn.send({
+      type: 'roomState',
+      players: Array.from(this.players.entries()),
+      roomCode: this.roomCode
+    });
+    
+    // Send game state for late joiners
+    if (this.onRequestGameState) {
+      const gameState = this.onRequestGameState();
+      if (gameState) {
+        conn.send({
+          type: 'gameStateSnapshot',
+          gameState: gameState
+        });
+      }
+    }
+
+    // Notify other players
+    this.broadcast({
+      type: 'playerJoined',
+      playerId: data.playerId,
+      name: data.name
+    }, conn);
+
+    if (this.onPlayerJoined) {
+      this.onPlayerJoined(data.playerId, data.name);
+    }
+    
+    console.log('✅ Player joined:', data.name);
+  }
+
+  /**
+   * Handle room state update
+   */
+  handleRoomState(data) {
+    data.players.forEach(([id, player]) => {
+      this.players.set(id, player);
+      if (this.onPlayerJoined) {
+        this.onPlayerJoined(id, player.name);
+      }
+    });
+    console.log('📊 Room state loaded:', data.players.length, 'players');
+  }
+
+  /**
+   * Handle player joined notification
+   */
+  handlePlayerJoined(data) {
+    this.players.set(data.playerId, {
+      name: data.name,
+      character: null,
+      score: 0
+    });
+    if (this.onPlayerJoined) {
+      this.onPlayerJoined(data.playerId, data.name);
+    }
+    console.log('👋 Player joined:', data.name);
+  }
+
+  /**
+   * Handle player left notification
+   */
+  handlePlayerLeft(data) {
+    this.players.delete(data.playerId);
+    if (this.onPlayerLeft) {
+      this.onPlayerLeft(data.playerId);
+    }
+    console.log('👋 Player left:', data.playerId);
+  }
+
+  /**
+   * Handle character selection
+   */
+  handleCharacterSelect(data, conn) {
+    const player = this.players.get(data.playerId);
+    if (player) {
+      player.character = data.character;
+    }
+    if (this.isHost) {
+      this.broadcast(data, conn);
+    }
+    console.log('🎭 Character selected:', data.character);
+  }
+
+  /**
+   * Handle game start
+   */
+  handleStartGame(data) {
+    if (this.onStartGame) {
+      this.onStartGame(data.players);
+    }
+    console.log('🎮 Game starting with', data.players.length, 'players');
+  }
+
+  /**
+   * Send message to host (client only)
+   * @param {Object} data - Message data
+   */
   sendToHost(data) {
     if (this.conn && this.conn.open) {
       this.conn.send(data);
     }
   }
 
-  // Broadcast to all connected peers (host only)
+  /**
+   * Broadcast to all connected peers (host only)
+   * @param {Object} data - Message data
+   * @param {DataConnection} excludeConn - Connection to exclude
+   */
   broadcast(data, excludeConn = null) {
     if (!this.isHost) return;
     
@@ -439,7 +465,10 @@ class NetworkManager {
     });
   }
 
-  // Send character selection
+  /**
+   * Send character selection
+   * @param {string} character - Selected character
+   */
   selectCharacter(character) {
     if (!this.peer || !this.peer.open) return;
     
@@ -456,7 +485,9 @@ class NetworkManager {
     }
   }
 
-  // Start the game (host only)
+  /**
+   * Start the game (host only)
+   */
   startGame() {
     if (!this.isHost) {
       console.warn('⚠️ Only host can start game');
@@ -474,19 +505,20 @@ class NetworkManager {
       character: p.character
     }));
 
-    const message = {
+    this.broadcast({
       type: 'startGame',
       players: playersArray
-    };
-
-    this.broadcast(message);
+    });
     
     if (this.onStartGame) {
       this.onStartGame(playersArray);
     }
   }
 
-  // Send game state updates
+  /**
+   * Send game state updates
+   * @param {Object} playerData - Player state data
+   */
   sendGameState(playerData) {
     if (!this.peer || !this.peer.open) return;
     
@@ -507,7 +539,10 @@ class NetworkManager {
     }
   }
 
-  // Update player stats
+  /**
+   * Update player stats
+   * @param {Object} updates - Player updates
+   */
   updatePlayer(updates) {
     if (!this.peer || !this.peer.open) return;
     
@@ -524,11 +559,15 @@ class NetworkManager {
     }
   }
 
-  // Broadcast wave spawn (host only)
+  /**
+   * Broadcast wave spawn (host only)
+   * @param {number} waveNum - Wave number
+   * @param {Array} enemies - Enemy data array
+   */
   broadcastWaveSpawn(waveNum, enemies) {
     if (!this.isHost || !this.peer || !this.peer.open) return;
 
-    const message = {
+    this.broadcast({
       type: 'spawnWave',
       waveNum: waveNum,
       enemies: enemies.map(e => ({
@@ -542,16 +581,17 @@ class NetworkManager {
         speed: e.speed,
         radius: e.radius
       }))
-    };
-
-    this.broadcast(message);
+    });
   }
 
-  // Broadcast powerup spawn (host only)
+  /**
+   * Broadcast powerup spawn (host only)
+   * @param {Object} powerup - Powerup data
+   */
   broadcastPowerupSpawn(powerup) {
     if (!this.isHost || !this.peer || !this.peer.open) return;
 
-    const message = {
+    this.broadcast({
       type: 'spawnPowerup',
       powerup: {
         id: powerup.id || Math.random().toString(36),
@@ -560,12 +600,14 @@ class NetworkManager {
         type: powerup.type,
         life: powerup.life
       }
-    };
-
-    this.broadcast(message);
+    });
   }
 
-  // Broadcast powerup collection
+  /**
+   * Broadcast powerup collection
+   * @param {string} powerupId - Powerup ID
+   * @param {string} playerId - Player ID
+   */
   broadcastPowerupCollect(powerupId, playerId) {
     if (!this.peer || !this.peer.open) return;
     
@@ -582,11 +624,14 @@ class NetworkManager {
     }
   }
 
-  // Broadcast projectile spawn
+  /**
+   * Broadcast projectile spawn
+   * @param {Object} projectile - Projectile data
+   */
   broadcastProjectileSpawn(projectile) {
     if (!this.peer || !this.peer.open) return;
     
-    const message = {
+    this.broadcast({
       type: 'spawnProjectile',
       projectile: {
         id: projectile.id || Math.random().toString(36),
@@ -598,16 +643,14 @@ class NetworkManager {
         damage: projectile.damage,
         playerId: this.localPlayerId
       }
-    };
-
-    if (this.isHost) {
-      this.broadcast(message);
-    } else {
-      this.sendToHost(message);
-    }
+    });
   }
 
-  // Broadcast enemy damage (for kill stealing prevention)
+  /**
+   * Broadcast enemy damage
+   * @param {string} enemyId - Enemy ID
+   * @param {number} damage - Damage amount
+   */
   broadcastEnemyDamage(enemyId, damage) {
     if (!this.peer || !this.peer.open) return;
     
@@ -625,23 +668,27 @@ class NetworkManager {
     }
   }
 
-  // Broadcast enemy killed (host only)
+  /**
+   * Broadcast enemy killed (host only)
+   * @param {string} enemyId - Enemy ID
+   * @param {string} killerId - Killer player ID
+   */
   broadcastEnemyKilled(enemyId, killerId) {
     if (!this.isHost || !this.peer || !this.peer.open) return;
 
-    const message = {
+    this.broadcast({
       type: 'enemyKilled',
       enemyId: enemyId,
       playerId: killerId
-    };
-
-    this.broadcast(message);
+    });
   }
 
-
-  // Generate random 4-character room code
+  /**
+   * Generate random 4-character room code
+   * @returns {string} Room code
+   */
   generateRoomCode() {
-    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ23456789'; // Removed O, 0, 1, I for clarity
+    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < 4; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -649,7 +696,10 @@ class NetworkManager {
     return code;
   }
 
-  // Get all players in room
+  /**
+   * Get all players in room
+   * @returns {Array} Players array
+   */
   getPlayers() {
     return Array.from(this.players.entries()).map(([id, p]) => ({
       id,
@@ -658,7 +708,9 @@ class NetworkManager {
     }));
   }
 
-  // Disconnect and cleanup
+  /**
+   * Disconnect and cleanup
+   */
   disconnect() {
     console.log('🔌 Disconnecting...');
     
