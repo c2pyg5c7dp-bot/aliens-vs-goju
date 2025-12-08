@@ -1,0 +1,8 @@
+# Ignore files for Netlify deployment
+node_modules/
+.git/
+.vscode/
+*.log
+.DS_Store
+
+# Keep everything else for static deployment
