@@ -57,7 +57,6 @@ setTimeout(()=>{
 
 // Test Runner
 const testOutput = document.getElementById('testOutput');
-const testRunner = document.getElementById('testRunner');
 const runTestBtn = document.getElementById('runTestBtn');
 
 function log(msg, type='info'){ const div = document.createElement('div'); div.style.color = type === 'pass'? '#0f0' : type === 'fail'? '#f00' : '#0f0'; div.textContent = msg; testOutput.appendChild(div); testOutput.scrollTop = testOutput.scrollHeight; }
@@ -129,27 +128,84 @@ if(runTestBtn){
   console.warn('runTestBtn not found in DOM; tests button disabled.');
 }
 
-// Debug console minimize/maximize
+// Debug console mobile-friendly controls
 const dbgMinimize = document.getElementById('dbgMinimize');
-const dbgContent = document.getElementById('dbgContent');
-let isMinimized = false;
+const dbgTab = document.getElementById('dbgTab');
+const testRunner = document.getElementById('testRunner');
 
-if (dbgMinimize && dbgContent) {
-  dbgMinimize.addEventListener('click', () => {
-    isMinimized = !isMinimized;
-    if (isMinimized) {
-      dbgContent.style.display = 'none';
-      dbgMinimize.textContent = '+';
-      testRunner.style.maxHeight = 'auto';
-      testRunner.style.width = '150px';
-    } else {
-      dbgContent.style.display = 'block';
-      dbgMinimize.textContent = '−';
-      testRunner.style.maxHeight = '400px';
-      testRunner.style.width = '280px';
-    }
-  });
+let touchStartX = 0;
+let touchStartY = 0;
+let isDebugOpen = false;
+
+function openDebug() {
+  if (testRunner && dbgTab) {
+    testRunner.style.display = 'block';
+    dbgTab.style.display = 'none';
+    isDebugOpen = true;
+  }
 }
 
-// Show test runner on load after a delay
-setTimeout(()=>{ testRunner.style.display = 'block'; }, 500);
+function closeDebug() {
+  if (testRunner && dbgTab) {
+    testRunner.style.display = 'none';
+    dbgTab.style.display = 'flex';
+    isDebugOpen = false;
+  }
+}
+
+// Tab click to open debug
+if (dbgTab) {
+  dbgTab.addEventListener('click', openDebug);
+}
+
+// Minimize button to close
+if (dbgMinimize) {
+  dbgMinimize.addEventListener('click', closeDebug);
+}
+
+// Swipe right to close on mobile
+if (testRunner) {
+  testRunner.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  testRunner.addEventListener('touchmove', (e) => {
+    if (!touchStartX) return;
+    
+    const touchX = e.touches[0].clientX;
+    const touchY = e.touches[0].clientY;
+    const diffX = touchX - touchStartX;
+    const diffY = touchY - touchStartY;
+    
+    // If swiping right more than down/up
+    if (Math.abs(diffX) > Math.abs(diffY) && diffX > 50) {
+      testRunner.style.transform = `translateX(${Math.min(diffX, 300)}px)`;
+    }
+  }, { passive: true });
+
+  testRunner.addEventListener('touchend', (e) => {
+    if (!touchStartX) return;
+    
+    const touchX = e.changedTouches[0].clientX;
+    const diffX = touchX - touchStartX;
+    
+    // If swiped right more than 100px, close it
+    if (diffX > 100) {
+      closeDebug();
+    }
+    
+    // Reset transform
+    testRunner.style.transform = 'translateX(0)';
+    touchStartX = 0;
+    touchStartY = 0;
+  }, { passive: true });
+}
+
+// Start with tab showing, debug hidden
+if (dbgTab) {
+  dbgTab.style.display = 'flex';
+}
+if (testRunner) {
+  testRunner.style.display = 'none';
+}
