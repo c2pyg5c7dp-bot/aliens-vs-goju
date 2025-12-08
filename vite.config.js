@@ -29,7 +29,7 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist-production',
+    outDir: 'dist',
     assetsDir: 'assets',
     rollupOptions: {
       input: {
