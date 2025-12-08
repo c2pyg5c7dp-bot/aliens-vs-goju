@@ -1,0 +1,7 @@
+tunnel: YOUR-TUNNEL-ID
+credentials-file: C:\Users\clari\.cloudflared\YOUR-TUNNEL-ID.json
+
+ingress:
+  - hostname: YOUR-SUBDOMAIN.trycloudflare.com
+    service: http://localhost:8080
+  - service: http_status:404
