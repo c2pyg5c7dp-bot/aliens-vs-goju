@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord Test - Minimal</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #fff;
+      font-family: Arial, sans-serif;
+    }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      background: #2a2a3e;
+    }
+    .success { background: #2d5016; }
+    .error { background: #501616; }
+  </style>
+</head>
+<body>
+  <h1>Discord Activity Test - Minimal Version</h1>
+  <div id="status">Initializing...</div>
+  <div id="logs"></div>
+
+  <script type="module">
+    const statusDiv = document.getElementById('status');
+    const logsDiv = document.getElementById('logs');
+
+    function log(msg, isError = false) {
+      console.log(msg);
+      const div = document.createElement('div');
+      div.className = 'status' + (isError ? ' error' : ' success');
+      div.textContent = new Date().toLocaleTimeString() + ' - ' + msg;
+      logsDiv.appendChild(div);
+    }
+
+    log('Starting Discord SDK initialization...');
+
+    try {
+      // Import Discord SDK
+      const { DiscordSDK } = await import('https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1.2.0/+esm');
+      
+      log('Discord SDK imported successfully');
+
+      const discordSdk = new DiscordSDK(import.meta.env.VITE_DISCORD_CLIENT_ID || '1446725465300664402');
+      
+      log('Discord SDK instance created');
+
+      await discordSdk.ready();
+      
+      log('✓ Discord SDK ready!');
+      statusDiv.innerHTML = '<h2 style="color: #4CAF50;">✓ Discord Connected!</h2>';
+      statusDiv.className = 'status success';
+
+      // Authenticate
+      log('Starting authentication...');
+      const { code } = await discordSdk.commands.authorize({
+        client_id: import.meta.env.VITE_DISCORD_CLIENT_ID || '1446725465300664402',
+        response_type: 'code',
+        state: '',
+        prompt: 'none',
+        scope: ['identify', 'guilds']
+      });
+
+      log('✓ Authenticated! Code: ' + code.substring(0, 10) + '...');
+      
+      log('🎮 Discord Activity is working! You can now load the full game.');
+
+    } catch (error) {
+      log('✗ ERROR: ' + error.message, true);
+      statusDiv.innerHTML = '<h2 style="color: #f44336;">✗ Error: ' + error.message + '</h2>';
+      statusDiv.className = 'status error';
+      console.error('Full error:', error);
+    }
+  </script>
+</body>
+</html>
