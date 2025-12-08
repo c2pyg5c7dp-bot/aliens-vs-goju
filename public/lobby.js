@@ -167,6 +167,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const code = window.networkManager.createRoom();
         lobbyState.code = code;
         lobbyState.isHost = true;
+        lobbyState.hostPeerId = window.networkManager.localPlayerId;
+        
+        // Share the host peer ID mapping for cross-device connection
+        // Store a shareable link format: CODE|PEERID
+        const shareableCode = `${code}|${window.networkManager.localPlayerId}`;
+        lobbyState.shareableCode = shareableCode;
+        
+        console.log('📤 Shareable code:', shareableCode);
+        logToLobbyDebug(`📤 Share: ${shareableCode}`);
         
         // Set up network callbacks
         window.networkManager.onPlayerJoined = (playerId, playerName) => {
@@ -234,7 +243,21 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Confirm button
     joinLobbyConfirm.addEventListener('click', async () => {
-      const code = lobbyCodeInput.value.toUpperCase().trim();
+      let code = lobbyCodeInput.value.toUpperCase().trim();
+      let hostPeerId = null;
+      
+      // Check if code includes peer ID (format: CODE|PEERID)
+      if (code.includes('|')) {
+        const parts = code.split('|');
+        code = parts[0];
+        hostPeerId = parts[1];
+        console.log('📥 Received shareable code:', code, '| Host:', hostPeerId);
+        
+        // Store this mapping for the join attempt
+        const sharedRooms = JSON.parse(localStorage.getItem('sharedRoomCodes') || '{}');
+        sharedRooms[code] = hostPeerId;
+        localStorage.setItem('sharedRoomCodes', JSON.stringify(sharedRooms));
+      }
       
       // Validate code
       if (code.length !== 4) {
@@ -347,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (copyBtn) {
     copyBtn.addEventListener('click', () => {
       const codeInput = document.getElementById('lobbyCodeDisplay');
-      const codeToCopy = lobbyState.code || (codeInput ? codeInput.value : '');
+      const codeToCopy = lobbyState.shareableCode || lobbyState.code || (codeInput ? codeInput.value : '');
       
       if (!codeToCopy || codeToCopy === 'XXXX') {
         copyBtn.textContent = '❌ No code';
@@ -376,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (shareBtn) {
     shareBtn.addEventListener('click', () => {
       const codeInput = document.getElementById('lobbyCodeDisplay');
-      const codeToShare = lobbyState.code || (codeInput ? codeInput.value : '');
+      const codeToShare = lobbyState.shareableCode || lobbyState.code || (codeInput ? codeInput.value : '');
       
       if (!codeToShare || codeToShare === 'XXXX') {
         shareBtn.textContent = '❌ No code';

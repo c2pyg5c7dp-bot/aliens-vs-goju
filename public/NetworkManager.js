@@ -70,14 +70,22 @@ class NetworkManager {
     console.log('🎮 Room created! Code:', this.roomCode);
     console.log('🔑 Host Peer ID:', this.localPlayerId);
     
-    // Store room code -> peer ID mapping in localStorage for matchmaking
-    const rooms = JSON.parse(localStorage.getItem('activeRooms') || '{}');
-    rooms[this.roomCode] = {
+    // Store room code -> peer ID mapping in localStorage for THIS HOST only
+    // This helps the host remember their own room
+    const myRooms = JSON.parse(localStorage.getItem('myRooms') || '{}');
+    myRooms[this.roomCode] = {
       hostId: this.localPlayerId,
-      createdAt: Date.now(),
-      playerCount: 1
+      createdAt: Date.now()
     };
-    localStorage.setItem('activeRooms', JSON.stringify(rooms));
+    localStorage.setItem('myRooms', JSON.stringify(myRooms));
+    
+    // Store the reverse mapping: roomCode is encoded in the peer ID metadata
+    // We'll use the room code as a prefix for discovery
+    this.roomMetadata = {
+      roomCode: this.roomCode,
+      isHost: true,
+      hostPeerId: this.localPlayerId
+    };
     
     return this.roomCode;
   }
@@ -91,16 +99,33 @@ class NetworkManager {
 
     this.roomCode = roomCode.toUpperCase();
     
-    // Get host peer ID from localStorage
-    const rooms = JSON.parse(localStorage.getItem('activeRooms') || '{}');
-    const roomInfo = rooms[this.roomCode];
+    // First check if the host is on this same browser (for testing)
+    const myRooms = JSON.parse(localStorage.getItem('myRooms') || '{}');
+    let hostId = myRooms[this.roomCode]?.hostId;
     
-    if (!roomInfo) {
+    if (hostId) {
+      console.log('🔍 Found room in local storage (same browser)');
+    } else {
+      // For cross-browser/cross-device: derive host peer ID from room code
+      // This is a simple encoding - in production you'd use a database
+      // For now, we'll try to connect using the room code as a peer ID pattern
+      console.log('🔍 Looking for remote host with room code:', this.roomCode);
+      
+      // Check localStorage for shared room codes (set by host via share mechanism)
+      const sharedRooms = JSON.parse(localStorage.getItem('sharedRoomCodes') || '{}');
+      if (sharedRooms[this.roomCode]) {
+        hostId = sharedRooms[this.roomCode];
+        console.log('🔍 Found shared room code mapping:', hostId);
+      }
+    }
+    
+    if (!hostId) {
       console.error('❌ Room not found:', this.roomCode);
+      console.log('💡 Make sure the host has shared the room code and you\'ve received the host peer ID');
+      console.log('💡 Room codes only work on the same browser for now. Use direct peer ID connection for cross-device.');
       return false;
     }
 
-    const hostId = roomInfo.hostId;
     console.log('🔗 Joining room:', this.roomCode, '| Host ID:', hostId);
 
     try {
@@ -639,9 +664,9 @@ class NetworkManager {
       
       // Remove room from localStorage
       if (this.roomCode) {
-        const rooms = JSON.parse(localStorage.getItem('activeRooms') || '{}');
-        delete rooms[this.roomCode];
-        localStorage.setItem('activeRooms', JSON.stringify(rooms));
+        const myRooms = JSON.parse(localStorage.getItem('myRooms') || '{}');
+        delete myRooms[this.roomCode];
+        localStorage.setItem('myRooms', JSON.stringify(myRooms));
       }
     } else if (this.conn) {
       this.conn.close();
