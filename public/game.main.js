@@ -194,6 +194,104 @@ function handleGameStateUpdate(data) {
 // Setup network callbacks
 if (window.networkManager) {
   window.networkManager.onGameStateUpdate = handleGameStateUpdate;
+  
+  // Handle wave spawn from host
+  window.networkManager.onSpawnWave = (waveNum, enemyData) => {
+    console.log(`📥 Received wave ${waveNum} with ${enemyData.length} enemies`);
+    wave = waveNum;
+    waveInProgress = true;
+    
+    // Clear existing enemies
+    enemies.length = 0;
+    spawnQueue.length = 0;
+    
+    // Create enemies from network data
+    const useSpawnQueue = waveNum > 3;
+    enemyData.forEach(data => {
+      const e = new Enemy(data.x, data.y, data.hp, data.isGolem, data.isRedAlien, data.id);
+      e.maxHp = data.maxHp;
+      e.speed = data.speed;
+      e.radius = data.radius;
+      
+      if (useSpawnQueue) {
+        spawnQueue.push(e);
+      } else {
+        enemies.push(e);
+      }
+    });
+    
+    console.log(`✅ Spawned ${enemyData.length} enemies for wave ${waveNum}`);
+  };
+  
+  // Handle powerup spawn from host
+  window.networkManager.onSpawnPowerup = (powerupData) => {
+    const p = new PowerUp(powerupData.x, powerupData.y, powerupData.type, powerupData.id);
+    p.life = powerupData.life;
+    powerups.push(p);
+    console.log(`📥 Received powerup: ${powerupData.type} at (${powerupData.x}, ${powerupData.y})`);
+  };
+  
+  // Handle powerup collection
+  window.networkManager.onCollectPowerup = (powerupId, playerId) => {
+    const idx = powerups.findIndex(p => p.id === powerupId);
+    if (idx >= 0) {
+      powerups.splice(idx, 1);
+      console.log(`🎁 Player ${playerId} collected powerup ${powerupId}`);
+    }
+  };
+  
+  // Handle projectile spawn from other players
+  window.networkManager.onSpawnProjectile = (projData) => {
+    // Don't spawn our own projectiles twice
+    if (projData.playerId === window.networkManager.localPlayerId) return;
+    
+    const p = new Projectile(projData.x, projData.y, projData.vx, projData.vy, projData.type, projData.damage, projData.id);
+    projectiles.push(p);
+    console.log(`💥 Player ${projData.playerId} fired ${projData.type}`);
+  };
+  
+  // Handle enemy damage
+  window.networkManager.onEnemyDamage = (enemyId, damage, playerId) => {
+    const enemy = enemies.find(e => e.id === enemyId);
+    if (enemy) {
+      enemy.hp -= damage;
+      console.log(`🎯 Enemy ${enemyId} took ${damage} damage from ${playerId}`);
+    }
+  };
+  
+  // Handle enemy killed
+  window.networkManager.onEnemyKilled = (enemyId, killerId) => {
+    const idx = enemies.findIndex(e => e.id === enemyId);
+    if (idx >= 0) {
+      enemies.splice(idx, 1);
+      console.log(`💀 Enemy ${enemyId} killed by ${killerId}`);
+    }
+  };
+}
+
+// Helper to spawn powerup with network sync
+function spawnPowerupWithSync(x, y, type) {
+  // In co-op mode, only host spawns powerups
+  if (window.isCoopMode && window.networkManager && !window.networkManager.isHost) {
+    return null; // Clients don't spawn, they receive from host
+  }
+  
+  const powerup = new PowerUp(x, y, type);
+  powerups.push(powerup);
+  
+  // Broadcast to clients if host in co-op
+  if (window.isCoopMode && window.networkManager && window.networkManager.isHost) {
+    window.networkManager.broadcastPowerupSpawn(powerup);
+  }
+  
+  return powerup;
+}
+
+// Helper function to check if we should spawn powerups (only host in co-op)
+function canSpawnPowerups() {
+  if (!window.isCoopMode) return true; // Solo mode always can
+  if (!window.networkManager) return true; // Not in multiplayer
+  return window.networkManager.isHost; // Only host spawns in co-op
 }
 
 
@@ -466,7 +564,8 @@ class Player {
 }
 
 class Enemy {
-  constructor(x, y, hp, isGolem = false, isRedAlien = false){
+  constructor(x, y, hp, isGolem = false, isRedAlien = false, id = null){
+    this.id = id || Math.random().toString(36).substr(2, 9); // Unique ID for network sync
     this.x = x; this.y = y; this.hp = hp; this.maxHp = hp;
     this.isGolem = isGolem;
     this.isRedAlien = isRedAlien;
@@ -509,7 +608,8 @@ class Enemy {
 }
 
 class Projectile {
-  constructor(x, y, vx, vy, type, damage){
+  constructor(x, y, vx, vy, type, damage, id = null){
+    this.id = id || Math.random().toString(36).substr(2, 9);
     this.x = x; this.y = y; this.vx = vx; this.vy = vy;
     this.type = type; this.damage = damage;
     this.radius = type === 'rocket' ? 7.5 : type === 'fireball' ? 7.5 : 3;
@@ -527,7 +627,8 @@ class EnemyProjectile {
 }
 
 class PowerUp {
-  constructor(x, y, type){
+  constructor(x, y, type, id = null){
+    this.id = id || Math.random().toString(36).substr(2, 9);
     this.x = x; this.y = y; this.type = type;
     this.radius = type === 'nuke' ? 15 : type === 'x2score' ? 15 : 10; this.life = POWERUP_DURATION;
     this.color = type === 'minigun' ? '#7fe8ff' : type === 'rocket' ? '#ffb27f' : type === 'shotgun' ? '#d19cff' : type === 'fireball' ? '#4da6ff' : type === 'nuke' ? '#ffff00' : type === 'speed' ? '#00ff88' : type === 'sword' ? '#c0c0c0' : type === 'x2score' ? '#ffa500' : '#fff28f';
@@ -940,6 +1041,12 @@ function renderLeaderboard(el){ const list = getHighScores(); if(!el) return; el
 
 // Wave spawning
 function startWave(){
+  // In co-op mode, only host spawns enemies
+  if (window.isCoopMode && window.networkManager && !window.networkManager.isHost) {
+    console.log('⏳ Waiting for host to spawn wave...');
+    return; // Clients wait for host
+  }
+  
   // Start a wave using the current `wave` number for scaling
   const spawnWaveNum = Math.max(1, wave || 1);
   waveInProgress = true;
@@ -1078,6 +1185,13 @@ function startWave(){
         enemies.push(redAlien);
       }
     }
+  }
+  
+  // Broadcast wave to clients in co-op mode
+  if (window.isCoopMode && window.networkManager && window.networkManager.isHost) {
+    const allEnemies = useSpawnQueue ? spawnQueue : enemies;
+    window.networkManager.broadcastWaveSpawn(spawnWaveNum, allEnemies);
+    console.log(`📡 Broadcast wave ${spawnWaveNum} with ${allEnemies.length} enemies`);
   }
 }
 
@@ -1522,13 +1636,15 @@ function update(dt){
         score += 10 * player.scoreMultiplier;
         spawnParticles(e.x, e.y, '#ff9b9b', 12, 120);
         explodeSound();
-        if(Math.random() < 0.12 * 0.35){
-          const r = Math.random();
-          const _pt = r < 0.25 ? 'minigun' : (r < 0.45 ? 'rocket' : (r < 0.65 ? 'shotgun' : (r < 0.80 ? 'fireball' : (r < 0.92 ? 'speed' : 'sword'))));
-          powerups.push(new PowerUp(e.x, e.y, _pt));
-        }
-        if(Math.random() < 0.01){ // Reduced from 0.03 to 0.01
-          powerups.push(new PowerUp(e.x, e.y, 'nuke'));
+        if(canSpawnPowerups()){
+          if(Math.random() < 0.12 * 0.35){
+            const r = Math.random();
+            const _pt = r < 0.25 ? 'minigun' : (r < 0.45 ? 'rocket' : (r < 0.65 ? 'shotgun' : (r < 0.80 ? 'fireball' : (r < 0.92 ? 'speed' : 'sword'))));
+            spawnPowerupWithSync(e.x, e.y, _pt);
+          }
+          if(Math.random() < 0.01){ // Reduced from 0.03 to 0.01
+            spawnPowerupWithSync(e.x, e.y, 'nuke');
+          }
         }
         if(Math.random() < 0.2) gems.push(new Gem(e.x, e.y, 8));
         if(Math.random() < 0.01) hearts.push(new Heart(e.x, e.y)); // 1% heart drop
@@ -1546,12 +1662,20 @@ function update(dt){
     if(dist > 6){
       const ax = dx / dist, ay = dy / dist;
       if(player.weapon === 'standard'){
-        projectiles.push(new Projectile(player.x, player.y, ax * 380, ay * 380, 'bullet', Math.round(player.damage)));
+        const proj = new Projectile(player.x, player.y, ax * 380, ay * 380, 'bullet', Math.round(player.damage));
+        projectiles.push(proj);
+        if (window.isCoopMode && window.networkManager) {
+          window.networkManager.broadcastProjectileSpawn(proj);
+        }
         window._firedShots++;
         player.fireTimer = player.fireRate;
         beep(1000, 0.06, 'square');
       } else if(player.weapon === 'minigun'){
-        projectiles.push(new Projectile(player.x, player.y, ax * 420, ay * 420, 'bullet', Math.round(player.damage)));
+        const proj = new Projectile(player.x, player.y, ax * 420, ay * 420, 'bullet', Math.round(player.damage));
+        projectiles.push(proj);
+        if (window.isCoopMode && window.networkManager) {
+          window.networkManager.broadcastProjectileSpawn(proj);
+        }
         window._firedShots++;
         player.fireTimer = player.fireRate * 0.33; // 200% faster (3x speed = 1/3 time)
         beep(1200, 0.03, 'square');
@@ -1559,18 +1683,30 @@ function update(dt){
         const spread = 0.42;
         for(let k = -2; k <= 2; k++){
           const ang = Math.atan2(ay, ax) + (k * spread / 4);
-          projectiles.push(new Projectile(player.x, player.y, Math.cos(ang) * 360, Math.sin(ang) * 360, 'bullet', Math.round(player.damage)));
+          const proj = new Projectile(player.x, player.y, Math.cos(ang) * 360, Math.sin(ang) * 360, 'bullet', Math.round(player.damage));
+          projectiles.push(proj);
+          if (window.isCoopMode && window.networkManager) {
+            window.networkManager.broadcastProjectileSpawn(proj);
+          }
           window._firedShots++;
         }
         player.fireTimer = Math.max(0.02, player.fireRate * 0.525); // 50% slower fire rate (0.35 * 1.5)
         beep(900, 0.04, 'square');
       } else if(player.weapon === 'rocket'){
-        projectiles.push(new Projectile(player.x, player.y, ax * 260, ay * 260, 'rocket', Math.round(player.damage * 8)));
+        const proj = new Projectile(player.x, player.y, ax * 260, ay * 260, 'rocket', Math.round(player.damage * 8));
+        projectiles.push(proj);
+        if (window.isCoopMode && window.networkManager) {
+          window.networkManager.broadcastProjectileSpawn(proj);
+        }
         window._firedShots++;
         player.fireTimer = player.fireRate * 3;
         beep(350, 0.18, 'sine');
       } else if(player.weapon === 'fireball'){
-        projectiles.push(new Projectile(player.x, player.y, ax * 260, ay * 260, 'fireball', Math.round(player.damage * 8)));
+        const proj = new Projectile(player.x, player.y, ax * 260, ay * 260, 'fireball', Math.round(player.damage * 8));
+        projectiles.push(proj);
+        if (window.isCoopMode && window.networkManager) {
+          window.networkManager.broadcastProjectileSpawn(proj);
+        }
         window._firedShots++;
         player.fireTimer = player.fireRate * 2.5;
         beep(450, 0.15, 'triangle');
@@ -1810,11 +1946,11 @@ function update(dt){
             if(Math.random() < 0.12 * 0.35){
               const r = Math.random();
               const _pt = r < 0.3 ? 'minigun' : (r < 0.55 ? 'rocket' : (r < 0.75 ? 'shotgun' : (r < 0.9 ? 'fireball' : 'speed')));
-              powerups.push(new PowerUp(e.x, e.y, _pt));
+              spawnPowerupWithSync(e.x, e.y, _pt));
             }
             // 1% chance to drop nuke (reduced from 3%)
             if(Math.random() < 0.01){
-              powerups.push(new PowerUp(e.x, e.y, 'nuke'));
+              spawnPowerupWithSync(e.x, e.y, 'nuke'));
             }
             if(Math.random() < 0.2) gems.push(new Gem(e.x, e.y, 8));
             if(Math.random() < 0.01) hearts.push(new Heart(e.x, e.y)); // 1% heart drop
@@ -1849,14 +1985,14 @@ function update(dt){
               if(Math.random() < 0.12 * 0.35){
                 const r = Math.random();
                 const _pt = r < 0.3 ? 'minigun' : (r < 0.55 ? 'rocket' : (r < 0.75 ? 'shotgun' : (r < 0.9 ? 'fireball' : 'speed')));
-                powerups.push(new PowerUp(e.x, e.y, _pt));
+                spawnPowerupWithSync(e.x, e.y, _pt));
               }
               // 1% chance to drop nuke
               if(Math.random() < 0.01){
-                powerups.push(new PowerUp(e.x, e.y, 'nuke'));
+                spawnPowerupWithSync(e.x, e.y, 'nuke'));
               }
               if(Math.random() < 0.01){ // 1% chance for x2 score
-                powerups.push(new PowerUp(e.x, e.y, 'x2score'));
+                spawnPowerupWithSync(e.x, e.y, 'x2score'));
               }
               if(Math.random() < 0.2) gems.push(new Gem(e.x, e.y, 8));
               if(Math.random() < 0.01) hearts.push(new Heart(e.x, e.y)); // 1% heart drop
@@ -1911,6 +2047,11 @@ function update(dt){
       continue;
     }
     if(Math.hypot(u.x - player.x, u.y - player.y) < u.radius + player.radius){
+      // Broadcast powerup collection in co-op
+      if (window.isCoopMode && window.networkManager) {
+        window.networkManager.broadcastPowerupCollect(u.id, window.networkManager.localPlayerId);
+      }
+      
       // Activate powerup for configured duration
       const dur = POWERUP_DURATION; // seconds
       player.activePowerups = player.activePowerups || {};
@@ -1927,15 +2068,15 @@ function update(dt){
           if(Math.random() < 0.12 * 0.35){
             const r = Math.random();
             const _pt = r < 0.3 ? 'minigun' : (r < 0.55 ? 'rocket' : (r < 0.75 ? 'shotgun' : (r < 0.9 ? 'fireball' : 'speed')));
-            powerups.push(new PowerUp(e.x, e.y, _pt));
+            spawnPowerupWithSync(e.x, e.y, _pt));
           }
           // 1% chance to drop nuke
           if(Math.random() < 0.01){
-            powerups.push(new PowerUp(e.x, e.y, 'nuke'));
+            spawnPowerupWithSync(e.x, e.y, 'nuke'));
           }
           // 1% chance to drop x2score
           if(Math.random() < 0.01){
-            powerups.push(new PowerUp(e.x, e.y, 'x2score'));
+            spawnPowerupWithSync(e.x, e.y, 'x2score'));
           }
           // Drop gems
           if(Math.random() < 0.2) gems.push(new Gem(e.x, e.y, 8));
@@ -2030,14 +2171,14 @@ function update(dt){
         if(Math.random() < 0.12 * 0.35){
           const r = Math.random();
           const _pt = r < 0.3 ? 'minigun' : (r < 0.55 ? 'rocket' : (r < 0.75 ? 'shotgun' : (r < 0.9 ? 'fireball' : 'speed')));
-          powerups.push(new PowerUp(e.x, e.y, _pt));
+          spawnPowerupWithSync(e.x, e.y, _pt));
         }
         // 1% chance to drop nuke (reduced from 3%)
         if(Math.random() < 0.01){
-          powerups.push(new PowerUp(e.x, e.y, 'nuke'));
+          spawnPowerupWithSync(e.x, e.y, 'nuke'));
         }
         if(Math.random() < 0.01){ // 1% chance for x2 score
-          powerups.push(new PowerUp(e.x, e.y, 'x2score'));
+          spawnPowerupWithSync(e.x, e.y, 'x2score'));
         }
         if(Math.random() < 0.2) gems.push(new Gem(e.x, e.y, 8));
         if(Math.random() < 0.01) hearts.push(new Heart(e.x, e.y)); // 1% heart drop
@@ -2869,42 +3010,42 @@ function initDebugConsole(){
   
   // Powerup spawn handlers
   if(btnSpawnMinigun) btnSpawnMinigun.addEventListener('click', ()=>{ 
-    powerups.push(new PowerUp(W/2, H/2, 'minigun')); 
+    spawnPowerupWithSync(W/2, H/2, 'minigun')); 
     debugLog('Spawned Minigun at center'); 
     updateDebugStats(); 
   });
   if(btnSpawnRocket) btnSpawnRocket.addEventListener('click', ()=>{ 
-    powerups.push(new PowerUp(W/2, H/2, 'rocket')); 
+    spawnPowerupWithSync(W/2, H/2, 'rocket')); 
     debugLog('Spawned Rocket at center'); 
     updateDebugStats(); 
   });
   if(btnSpawnShotgun) btnSpawnShotgun.addEventListener('click', ()=>{ 
-    powerups.push(new PowerUp(W/2, H/2, 'shotgun')); 
+    spawnPowerupWithSync(W/2, H/2, 'shotgun')); 
     debugLog('Spawned Shotgun at center'); 
     updateDebugStats(); 
   });
   if(btnSpawnFireball) btnSpawnFireball.addEventListener('click', ()=>{ 
-    powerups.push(new PowerUp(W/2, H/2, 'fireball')); 
+    spawnPowerupWithSync(W/2, H/2, 'fireball')); 
     debugLog('Spawned Fireball at center'); 
     updateDebugStats(); 
   });
   if(btnSpawnNuke) btnSpawnNuke.addEventListener('click', ()=>{ 
-    powerups.push(new PowerUp(W/2, H/2, 'nuke')); 
+    spawnPowerupWithSync(W/2, H/2, 'nuke')); 
     debugLog('Spawned NUKE at center'); 
     updateDebugStats(); 
   });
   if(btnSpawnSpeed) btnSpawnSpeed.addEventListener('click', ()=>{ 
-    powerups.push(new PowerUp(W/2, H/2, 'speed')); 
+    spawnPowerupWithSync(W/2, H/2, 'speed')); 
     debugLog('Spawned Speed Boost at center'); 
     updateDebugStats(); 
   });
   if(btnSpawnSword) btnSpawnSword.addEventListener('click', ()=>{ 
-    powerups.push(new PowerUp(W/2, H/2, 'sword')); 
+    spawnPowerupWithSync(W/2, H/2, 'sword')); 
     debugLog('Spawned Sword at center'); 
     updateDebugStats(); 
   });
   if(btnSpawnX2Score) btnSpawnX2Score.addEventListener('click', ()=>{ 
-    powerups.push(new PowerUp(W/2, H/2, 'x2score')); 
+    spawnPowerupWithSync(W/2, H/2, 'x2score')); 
     debugLog('Spawned X2 Score at center'); 
     updateDebugStats(); 
   });

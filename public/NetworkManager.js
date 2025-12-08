@@ -285,6 +285,63 @@ class NetworkManager {
           this.broadcast(data, conn);
         }
         break;
+
+      case 'spawnEnemy':
+        // Host spawned an enemy - clients create it locally
+        if (this.onSpawnEnemy) {
+          this.onSpawnEnemy(data.enemy);
+        }
+        break;
+
+      case 'spawnWave':
+        // Host starting a new wave
+        if (this.onSpawnWave) {
+          this.onSpawnWave(data.waveNum, data.enemies);
+        }
+        break;
+
+      case 'spawnPowerup':
+        // Host spawned a powerup
+        if (this.onSpawnPowerup) {
+          this.onSpawnPowerup(data.powerup);
+        }
+        break;
+
+      case 'collectPowerup':
+        // Someone collected a powerup
+        if (this.onCollectPowerup) {
+          this.onCollectPowerup(data.powerupId, data.playerId);
+        }
+        break;
+
+      case 'spawnProjectile':
+        // Player fired a projectile
+        if (this.onSpawnProjectile) {
+          this.onSpawnProjectile(data.projectile);
+        }
+        // Broadcast if host
+        if (this.isHost) {
+          this.broadcast(data, conn);
+        }
+        break;
+
+      case 'enemyDamage':
+        // Enemy took damage
+        if (this.onEnemyDamage) {
+          this.onEnemyDamage(data.enemyId, data.damage, data.playerId);
+        }
+        // Broadcast if host
+        if (this.isHost) {
+          this.broadcast(data, conn);
+        }
+        break;
+
+      case 'enemyKilled':
+        // Enemy was killed
+        if (this.onEnemyKilled) {
+          this.onEnemyKilled(data.enemyId, data.playerId);
+        }
+        break;
     }
   }
 
@@ -402,6 +459,115 @@ class NetworkManager {
       this.sendToHost(message);
     }
   }
+
+  // Broadcast wave spawn (host only)
+  broadcastWaveSpawn(waveNum, enemies) {
+    if (!this.isHost) return;
+
+    const message = {
+      type: 'spawnWave',
+      waveNum: waveNum,
+      enemies: enemies.map(e => ({
+        id: e.id || Math.random().toString(36),
+        x: e.x,
+        y: e.y,
+        hp: e.hp,
+        maxHp: e.maxHp,
+        isGolem: e.isGolem,
+        isRedAlien: e.isRedAlien,
+        speed: e.speed,
+        radius: e.radius
+      }))
+    };
+
+    this.broadcast(message);
+  }
+
+  // Broadcast powerup spawn (host only)
+  broadcastPowerupSpawn(powerup) {
+    if (!this.isHost) return;
+
+    const message = {
+      type: 'spawnPowerup',
+      powerup: {
+        id: powerup.id || Math.random().toString(36),
+        x: powerup.x,
+        y: powerup.y,
+        type: powerup.type,
+        life: powerup.life
+      }
+    };
+
+    this.broadcast(message);
+  }
+
+  // Broadcast powerup collection
+  broadcastPowerupCollect(powerupId, playerId) {
+    const message = {
+      type: 'collectPowerup',
+      powerupId: powerupId,
+      playerId: playerId
+    };
+
+    if (this.isHost) {
+      this.broadcast(message);
+    } else {
+      this.sendToHost(message);
+    }
+  }
+
+  // Broadcast projectile spawn
+  broadcastProjectileSpawn(projectile) {
+    const message = {
+      type: 'spawnProjectile',
+      projectile: {
+        id: projectile.id || Math.random().toString(36),
+        x: projectile.x,
+        y: projectile.y,
+        vx: projectile.vx,
+        vy: projectile.vy,
+        type: projectile.type,
+        damage: projectile.damage,
+        playerId: this.localPlayerId
+      }
+    };
+
+    if (this.isHost) {
+      this.broadcast(message);
+    } else {
+      this.sendToHost(message);
+    }
+  }
+
+  // Broadcast enemy damage (for kill stealing prevention)
+  broadcastEnemyDamage(enemyId, damage) {
+    const message = {
+      type: 'enemyDamage',
+      enemyId: enemyId,
+      damage: damage,
+      playerId: this.localPlayerId
+    };
+
+    if (this.isHost) {
+      this.broadcast(message);
+    } else {
+      this.sendToHost(message);
+    }
+  }
+
+  // Broadcast enemy killed (host only)
+  broadcastEnemyKilled(enemyId, killerId) {
+    if (!this.isHost) return;
+
+    const message = {
+      type: 'enemyKilled',
+      enemyId: enemyId,
+      playerId: killerId
+    };
+
+    this.broadcast(message);
+  }
+
 
   // Generate random 4-character room code
   generateRoomCode() {
