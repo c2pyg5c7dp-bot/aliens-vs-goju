@@ -400,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
-  // Share button
+  // Share button - Discord invite
   const shareBtn = document.getElementById('shareLobbyCode');
   if (shareBtn) {
     shareBtn.addEventListener('click', () => {
@@ -409,23 +409,33 @@ document.addEventListener('DOMContentLoaded', () => {
       
       if (!codeToShare || codeToShare === 'XXXX') {
         shareBtn.textContent = '❌ No code';
-        setTimeout(() => shareBtn.textContent = '🔗 Share', 2000);
+        setTimeout(() => shareBtn.textContent = '💬 Invite to Discord', 2000);
         return;
       }
       
-      const shareText = `Join my Aliens vs Goju co-op game! Code: ${codeToShare}`;
-      if (navigator.share) {
-        navigator.share({ text: shareText }).catch(err => {
-          console.log('Share cancelled or failed:', err);
-        });
-      } else {
-        navigator.clipboard.writeText(shareText).then(() => {
-          shareBtn.textContent = '✅ Copied!';
-          setTimeout(() => shareBtn.textContent = '🔗 Share', 2000);
-        }).catch(err => {
-          console.error('Failed to copy share text:', err);
-        });
-      }
+      // Create Discord invite message with the game link and code
+      const gameUrl = window.location.origin;
+      const inviteMessage = `🎮 Join my Aliens vs Goju co-op game!\n\n🔗 Play here: ${gameUrl}\n🎟️ Room Code: ${codeToShare}\n\nClick Co-op, then Join Lobby and paste the code!`;
+      
+      // Try to open Discord with the message
+      // If user has Discord installed, this will open it
+      const discordUrl = `https://discord.com/channels/@me`;
+      
+      // Copy the invite message to clipboard
+      navigator.clipboard.writeText(inviteMessage).then(() => {
+        // Open Discord
+        window.open(discordUrl, '_blank');
+        
+        shareBtn.textContent = '✅ Message copied!';
+        setTimeout(() => shareBtn.textContent = '💬 Invite to Discord', 3000);
+        
+        // Show helpful message
+        alert('📋 Invite message copied to clipboard!\n\n💬 Discord is opening - paste the message to invite your friends!\n\nThey\'ll get the game link and room code.');
+      }).catch(err => {
+        console.error('Failed to copy invite message:', err);
+        shareBtn.textContent = '❌ Failed';
+        setTimeout(() => shareBtn.textContent = '💬 Invite to Discord', 2000);
+      });
     });
   }
   
