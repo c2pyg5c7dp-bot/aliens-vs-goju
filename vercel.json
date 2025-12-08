@@ -1,9 +1,8 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "dist-production",
+  "outputDirectory": "dist",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "framework": "vite",
   "headers": [
     {
       "source": "/(.*)",
