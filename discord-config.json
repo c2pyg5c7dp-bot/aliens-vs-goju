@@ -1,7 +1,0 @@
-{
-  "name": "Aliens vs Goju",
-  "description": "Survive waves of enemies in this action-packed survival game!",
-  "default_orientation_lock": "unlocked",
-  "supported_platforms": ["desktop", "mobile"],
-  "age_rating": "everyone"
-}

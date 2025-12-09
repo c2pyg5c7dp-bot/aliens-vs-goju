@@ -87,7 +87,7 @@ aliens-vs-goju/
 ├── game.js           # Main game logic
 ├── main.js           # Discord SDK initialization
 ├── discordSdk.js     # Discord SDK wrapper
-├── index.html        # Entry point
+├── aliensvsgoju.html # Entry point
 ├── style.css         # Styles
 └── vite.config.js    # Vite configuration
 ```
