@@ -57,6 +57,98 @@ resizeCanvas();
 const startBtn = document.getElementById('startBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const restartBtn = document.getElementById('restartBtn');
+// Game Over Screen Buttons
+window.addEventListener('DOMContentLoaded', () => {
+  const restartBtn = document.getElementById('restartGameBtn');
+  const menuBtn = document.getElementById('returnMenuBtn');
+  const startMenuMusic = document.getElementById('startMenuMusic');
+  let musicUnmuted = false;
+  
+  // Function to unmute and set volume
+  const setupAudio = () => {
+    if(startMenuMusic && !musicUnmuted) {
+      const savedVol = parseFloat(localStorage.getItem('gameVolume') || 30) / 100;
+      startMenuMusic.muted = false;
+      startMenuMusic.volume = savedVol;
+      startMenuMusic.play().catch(e => console.log('Play failed:', e));
+      musicUnmuted = true;
+      console.log('Music unmuted and playing at volume:', savedVol);
+    }
+  };
+  
+  // Unmute on first click (allows autoplay)
+  const setupAudioOnClick = () => {
+    setupAudio();
+    // Hide the click to start prompt
+    const clickPrompt = document.getElementById('clickToStart');
+    if(clickPrompt) clickPrompt.style.display = 'none';
+    document.removeEventListener('click', setupAudioOnClick);
+  };
+  document.addEventListener('click', setupAudioOnClick);
+  
+  // Only pause music when START or CO-OP buttons are clicked (gameplay starts)
+  const startBtn = document.getElementById('startBtn');
+  const coopBtn = document.getElementById('coopBtn');
+  if(startBtn) {
+    startBtn.addEventListener('click', () => {
+      playUiClick();
+      if(startMenuMusic) startMenuMusic.pause();
+    });
+  }
+  if(coopBtn) {
+    coopBtn.addEventListener('click', () => {
+      playUiClick();
+      if(startMenuMusic) startMenuMusic.pause();
+    });
+  }
+  
+  // Play UI click for menu navigation buttons without pausing music
+  const upgradesBtn = document.getElementById('upgradesBtn');
+  const optionsBtn_click = document.getElementById('optionsBtn');
+  const exitBtn_click = document.getElementById('exitBtn');
+  if(upgradesBtn) {
+    upgradesBtn.addEventListener('click', () => {
+      playUiClick();
+    });
+  }
+  if(optionsBtn_click) {
+    optionsBtn_click.addEventListener('click', () => {
+      playUiClick();
+    });
+  }
+  if(exitBtn_click) {
+    exitBtn_click.addEventListener('click', () => {
+      playUiClick();
+    });
+  }
+  if(restartBtn) restartBtn.onclick = () => {
+    // Hide game over, reset game, start new run
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    if(gameOverScreen) gameOverScreen.style.display = 'none';
+    if(document.getElementById('hud')) document.getElementById('hud').style.display = 'block';
+    gameState = 'playing';
+    running = true;
+    paused = false;
+    if(startMenuMusic) startMenuMusic.pause();
+    resetGame();
+    wave = 1;
+    startWave();
+    if(rafId === null) rafId = requestAnimationFrame(loop);
+  };
+  if(menuBtn) menuBtn.onclick = () => {
+    // Hide game over, show menu
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    if(gameOverScreen) gameOverScreen.style.display = 'none';
+    if(startScreen) startScreen.style.display = 'flex';
+    gameState = 'menu';
+    running = false;
+    paused = false;
+    if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    // Resume menu music
+    const startMenuMusic = document.getElementById('startMenuMusic');
+    if(startMenuMusic) startMenuMusic.play();
+  };
+});
 
 if (!startBtn) {
   console.error('CRITICAL: Start button not found!');
@@ -182,8 +274,23 @@ function saveStageProgress() {
 // Load stage progress on game start
 loadStageProgress();
 
+// Multiplayer player colors (assign to each player)
+const PLAYER_COLORS = [
+  '#FF6B6B', // Red
+  '#4ECDC4', // Teal
+  '#FFE66D', // Yellow
+  '#95E1D3'  // Mint
+];
+
 // Multiplayer player tracking
-let multiplayerPlayers = []; // Array of {id, name, score, character, position, health, vx, vy, animController}
+let multiplayerPlayers = []; // Array of {id, name, score, character, position, health, vx, vy, animController, color, isHost, isDead, deathTime}
+let coopDifficultyMultiplier = 1.0; // Scale difficulty based on player count
+let playerConnectionStatus = {}; // Track connection status by player ID
+
+// Helper to assign color to player
+function getPlayerColor(index) {
+  return PLAYER_COLORS[index % PLAYER_COLORS.length];
+}
 
 // Helper to create animation controller for a player
 function createPlayerAnimController() {
@@ -280,13 +387,15 @@ function drawMultiplayerPlayerSprite(ctx, mp) {
   }
 }
 
-function updateMultiplayerScore(playerId, playerName, playerScore, playerCharacter) {
+function updateMultiplayerScore(playerId, playerName, playerScore, playerCharacter, isHost = false) {
   const existing = multiplayerPlayers.find(p => p.id === playerId);
   if (existing) {
     existing.score = playerScore;
     existing.name = playerName;
     existing.character = playerCharacter;
+    existing.lastUpdateTime = Date.now();
   } else {
+    const colorIndex = multiplayerPlayers.length;
     const newPlayer = { 
       id: playerId, 
       name: playerName, 
@@ -294,18 +403,35 @@ function updateMultiplayerScore(playerId, playerName, playerScore, playerCharact
       character: playerCharacter, 
       x: 0, 
       y: 0, 
-      health: 0,
       vx: 0,
       vy: 0,
-      animController: createPlayerAnimController()
+      health: 100,
+      maxHealth: 100,
+      animController: createPlayerAnimController(),
+      color: getPlayerColor(colorIndex),
+      isHost: isHost,
+      isDead: false,
+      deathTime: 0,
+      respawnTimer: 0,
+      lastUpdateTime: Date.now(),
+      lastPosition: { x: 0, y: 0 },
+      interpolatedX: 0,
+      interpolatedY: 0,
+      ping: 0
     };
     multiplayerPlayers.push(newPlayer);
+    playerConnectionStatus[playerId] = {
+      ping: 0,
+      connected: true,
+      lastUpdate: Date.now()
+    };
   }
 }
 
 // Network sync timer
 let networkSyncTimer = 0;
-const NETWORK_SYNC_INTERVAL = 0.1; // Send updates 10 times per second
+const NETWORK_SYNC_INTERVAL = 0.05; // Send updates 20 times per second for better responsiveness
+let lastNetworkPing = Date.now();
 
 // Send game state to other players
 function sendGameState() {
@@ -315,37 +441,111 @@ function sendGameState() {
     position: { x: player.x, y: player.y },
     velocity: { vx: player.vx, vy: player.vy },
     health: player.health,
-    score: score
+    maxHealth: player.maxHealth,
+    score: score,
+    timestamp: Date.now(),
+    isDead: player.isDead || false,
+    character: player.characterId || selectedCharacter
   });
 }
 
-// Handle received game state from other players
+// Handle received game state from other players with lag compensation
 function handleGameStateUpdate(data) {
   if (!data || !data.playerId) return;
   
-  // Track last update time for ping calculation
-  if (window.networkManager) {
-    window.networkManager._lastUpdateTime = Date.now();
-  }
-  
+  const now = Date.now();
   const p = multiplayerPlayers.find(player => player.id === data.playerId);
+  
   if (p) {
+    // Calculate ping
+    if (data.timestamp) {
+      p.ping = Math.max(0, now - data.timestamp);
+    }
+    
+    // Update connection status
+    if (playerConnectionStatus[data.playerId]) {
+      playerConnectionStatus[data.playerId].lastUpdate = now;
+      playerConnectionStatus[data.playerId].ping = p.ping;
+      playerConnectionStatus[data.playerId].connected = true;
+    }
+    
+    // Store last position for interpolation
     if (data.position) {
+      p.lastPosition = { x: p.x, y: p.y };
       p.x = data.position.x;
       p.y = data.position.y;
+      p.interpolatedX = data.position.x;
+      p.interpolatedY = data.position.y;
     }
+    
+    // Update velocity for movement prediction
     if (data.velocity) {
       p.vx = data.velocity.vx || 0;
       p.vy = data.velocity.vy || 0;
     }
-    if (data.health !== undefined) p.health = data.health;
+    
+    // Update health and track death
+    if (data.health !== undefined) {
+      const wasAlive = !p.isDead;
+      p.health = data.health;
+      p.isDead = data.isDead || false;
+      
+      if (wasAlive && p.isDead) {
+        p.deathTime = now;
+        p.respawnTimer = 5; // 5 second respawn
+      }
+    }
+    
+    if (data.maxHealth !== undefined) p.maxHealth = data.maxHealth;
     if (data.score !== undefined) p.score = data.score;
+    if (data.character !== undefined) p.character = data.character;
+    p.lastUpdateTime = now;
+  }
+}
+
+// Check for stale player connections periodically
+function checkPlayerConnections() {
+  if (!window.isCoopMode || !playerConnectionStatus) return;
+  
+  const now = Date.now();
+  const timeout = 10000; // 10 seconds
+  
+  Object.keys(playerConnectionStatus).forEach(playerId => {
+    const status = playerConnectionStatus[playerId];
+    if (status.lastUpdate && (now - status.lastUpdate) > timeout) {
+      status.connected = false;
+    }
+  });
+}
+
+// Apply position interpolation for smooth remote player movement
+function interpolatePlayerPosition(player, deltaTime) {
+  if (!player || player.isDead) return;
+  
+  // Interpolate towards current position for smooth movement
+  const speed = Math.sqrt(player.vx ** 2 + player.vy ** 2);
+  if (speed > 0) {
+    player.interpolatedX += player.vx * deltaTime;
+    player.interpolatedY += player.vy * deltaTime;
   }
 }
 
 // Setup network callbacks
 if (window.networkManager) {
   window.networkManager.onGameStateUpdate = handleGameStateUpdate;
+  
+  // Track player disconnections
+  window.networkManager.onPlayerLeft = (playerId) => {
+    const idx = multiplayerPlayers.findIndex(p => p.id === playerId);
+    if (idx >= 0) {
+      const player = multiplayerPlayers[idx];
+      console.log(`Player ${player.name} disconnected`);
+      multiplayerPlayers.splice(idx, 1);
+    }
+    if (playerConnectionStatus[playerId]) {
+      playerConnectionStatus[playerId].connected = false;
+    }
+  };
   
   // Handle wave spawn from host
   window.networkManager.onSpawnWave = (waveNum, enemyData) => {
@@ -565,7 +765,7 @@ const CHARACTERS = {
     fireRate: 0.18,
     gemPickupRange: 14,
     description: 'High health, slow but powerful',
-    color: '#ff4444' // Red
+    color: '#8B4513' // Brown
   },
   speedster: {
     name: 'Speedster',
@@ -813,6 +1013,9 @@ class Player {
     this.color = char.color; // Character color for fallback rendering
     this.critChance = permanentUpgrades.critChance * 0.05; // 5% per level
     this.projectileSize = 1 + (permanentUpgrades.projectileSize * 0.05); // 5% size per level
+    this.isDead = false; // Track death state for multiplayer
+    this.vx = 0; // Velocity X for movement sync
+    this.vy = 0; // Velocity Y for movement sync
   }
 }
 
@@ -885,8 +1088,11 @@ class PowerUp {
   constructor(x, y, type, id = null){
     this.id = id || Math.random().toString(36).substr(2, 9);
     this.x = x; this.y = y; this.type = type;
-    this.radius = type === 'nuke' ? 15 : type === 'x2score' ? 15 : 10; this.life = POWERUP_DURATION;
+    this.radius = type === 'nuke' ? 15 : type === 'x2score' ? 15 : 10; 
+    this.life = POWERUP_DURATION;
     this.color = type === 'minigun' ? '#7fe8ff' : type === 'rocket' ? '#ffb27f' : type === 'shotgun' ? '#d19cff' : type === 'fireball' ? '#4da6ff' : type === 'nuke' ? '#ffff00' : type === 'speed' ? '#00ff88' : type === 'sword' ? '#c0c0c0' : type === 'x2score' ? '#ffa500' : '#fff28f';
+    this.collectedBy = null; // Track which player collected this powerup
+    this.collectionTime = 0; // When was it collected
   }
 }
 
@@ -1090,8 +1296,20 @@ let player = new Player();
 const backgroundImage = new Image();
 backgroundImage.src = 'animations/background.png';
 let backgroundLoaded = false;
-backgroundImage.onload = () => { backgroundLoaded = true; };
-backgroundImage.onerror = () => { /* Background image optional */ };
+backgroundImage.onload = () => { 
+  backgroundLoaded = true;
+  console.log('Background loaded:', backgroundImage.width, 'x', backgroundImage.height);
+};
+backgroundImage.onerror = () => { 
+  console.warn('Background image failed to load');
+};
+
+// Gem sprite
+const gemImage = new Image();
+gemImage.src = 'animations/gem.png';
+let gemImageLoaded = false;
+gemImage.onload = () => { gemImageLoaded = true; console.log('Gem sprite loaded'); };
+gemImage.onerror = () => { console.warn('Gem sprite failed to load'); };
 
 // Enemy health bar sprite sheet
 const enemyHealthBarImage = new Image();
@@ -1137,6 +1355,48 @@ minigunImage.onload = () => {
   minigunPowerupLoaded = true;
 };
 minigunImage.onerror = () => { /* Minigun image optional */ };
+
+// Player with minigun sprite frames
+const minigunSpriteFrames = [];
+let minigunSpritesLoaded = 0;
+let minigunFrameTimer = 0;
+let minigunFrameIndex = 0;
+const minigunFrameCount = 3;
+
+for(let i = 0; i < minigunFrameCount; i++){
+  const img = new Image();
+  img.src = `animations/Player/animations/minigun/south/minigunsprite_${i}.png`;
+  img.onload = () => {
+    minigunSpritesLoaded++;
+    if(minigunSpritesLoaded === minigunFrameCount){
+      console.log('All minigun sprite frames loaded');
+    }
+  };
+  img.onerror = () => {
+    console.warn(`Failed to load minigun frame ${i}`);
+  };
+  minigunSpriteFrames.push(img);
+}
+
+// Bullet projectile sprite frames
+const bulletSpriteFrames = [];
+let bulletSpritesLoaded = 0;
+const bulletFrameCount = 7;
+
+for(let i = 0; i < bulletFrameCount; i++){
+  const img = new Image();
+  img.src = `animations/Player/animations/bulletprojectiles/sprite_bulletprojectiles${i}.png`;
+  img.onload = () => {
+    bulletSpritesLoaded++;
+    if(bulletSpritesLoaded === bulletFrameCount){
+      console.log('All bullet sprite frames loaded');
+    }
+  };
+  img.onerror = () => {
+    console.warn(`Failed to load bullet frame ${i}`);
+  };
+  bulletSpriteFrames.push(img);
+}
 
 // Shotgun powerup sprite
 const shotgunImage = new Image();
@@ -1234,6 +1494,7 @@ function drawDigitalText(text, x, y, charWidth = 30, charHeight = 40, spacing = 
 let audioCtx = null;
 function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ audioCtx = null; } } }
 function beep(freq, time=0.06, type='sine', vol=0.002){ try{ ensureAudio(); if(!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = type; o.frequency.setValueAtTime(freq, audioCtx.currentTime); g.gain.setValueAtTime(vol, audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + time); o.stop(audioCtx.currentTime + time + 0.02); } catch(e){} }
+function playUiClick(){ beep(900, 0.05, 'square', 0.003); }
 function explodeSound(){ try{ ensureAudio(); if(!audioCtx) return; const size = Math.floor(audioCtx.sampleRate * 0.12); const buf = audioCtx.createBuffer(1, size, audioCtx.sampleRate); const d = buf.getChannelData(0); for(let i=0;i<size;i++) d[i] = (Math.random()*2-1) * (1 - i/size); const src = audioCtx.createBufferSource(); src.buffer = buf; const g = audioCtx.createGain(); g.gain.setValueAtTime(0.6, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.14); src.connect(g); g.connect(audioCtx.destination); src.start(); } catch(e){} }
 
 // Power-up sounds
@@ -1492,12 +1753,20 @@ function startWave(){
   // Clear boss if moving to next wave after defeating it
   boss = null;
   waveInProgress = true;
+  
+  // Calculate difficulty multiplier based on co-op player count
+  const playerCount = 1 + (window.isCoopMode ? multiplayerPlayers.length : 0);
+  coopDifficultyMultiplier = Math.max(1.0, 1.0 + (playerCount - 1) * 0.4); // +40% difficulty per additional player
+  
   // Non-linear (exponential) enemy count scaling.
   // basePerWave: enemies on wave 1; growth: per-wave multiplier (>1 for increasing difficulty)
   const basePerWave = 10;
   const growth = 1.25; // Reduced from 1.38 for gentler difficulty curve
   // compute count with exponential growth and cap it to avoid runaway numbers
   let count = Math.min(1200, Math.max(1, Math.round(basePerWave * Math.pow(growth, spawnWaveNum - 1))));
+  
+  // Apply co-op difficulty scaling
+  count = Math.round(count * coopDifficultyMultiplier);
   
   // Apply enemy slowdown upgrade (2% reduction per level)
   const slowdownMultiplier = Math.max(0.6, 1 - (permanentUpgrades.enemySlowdown * 0.02)); // Min 60% spawn rate
@@ -1791,6 +2060,60 @@ function startGame(){
 
 startBtn.addEventListener('click', startGameFromUI);
 
+// Options button
+const optionsBtn = document.getElementById('optionsBtn');
+if(optionsBtn) {
+  optionsBtn.addEventListener('click', () => {
+    const optionsScreen = document.getElementById('optionsScreen');
+    const startScreen = document.getElementById('startScreen');
+    if(optionsScreen && startScreen) {
+      startScreen.style.display = 'none';
+      optionsScreen.style.display = 'flex';
+    }
+  });
+}
+
+// Options close button
+const closeOptionsBtn = document.getElementById('closeOptions');
+if(closeOptionsBtn) {
+  closeOptionsBtn.addEventListener('click', () => {
+    const optionsScreen = document.getElementById('optionsScreen');
+    const startScreen = document.getElementById('startScreen');
+    if(optionsScreen && startScreen) {
+      optionsScreen.style.display = 'none';
+      startScreen.style.display = 'flex';
+    }
+  });
+}
+
+// Volume slider
+const volumeSlider = document.getElementById('volumeSlider');
+const volumePercent = document.getElementById('volumePercent');
+const startMenuMusic = document.getElementById('startMenuMusic');
+if(volumeSlider) {
+  volumeSlider.addEventListener('input', (e) => {
+    const vol = e.target.value;
+    volumePercent.textContent = vol + '%';
+    if(startMenuMusic) startMenuMusic.volume = vol / 100;
+    localStorage.setItem('gameVolume', vol);
+  });
+  // Load saved volume
+  const savedVol = localStorage.getItem('gameVolume') || 30;
+  volumeSlider.value = savedVol;
+  volumePercent.textContent = savedVol + '%';
+  if(startMenuMusic) startMenuMusic.volume = savedVol / 100;
+}
+
+// Exit button
+const exitBtn = document.getElementById('exitBtn');
+if(exitBtn) {
+  exitBtn.addEventListener('click', () => {
+    if(confirm('Leave the game?')) {
+      window.close();
+    }
+  });
+}
+
 // Character selection handlers
 const characterCards = document.querySelectorAll('.character-card-modern');
 characterCards.forEach(card => {
@@ -1910,13 +2233,34 @@ function drawPlayer(ctx, p){
   } else if(p.characterId === 'glass_cannon' && window.glassCannonAnimController){
     animController = window.glassCannonAnimController;
   } else if(p.characterId === 'tank' && window.playerAnimController){
-    // Tank uses player animations but drawn with different color
     animController = window.playerAnimController;
   }
   
   if(animController){
     try{
-      drewSprite = animController.draw(ctx, p.x, p.y, 1.21);
+      // Check if player has minigun and should use minigun sprite
+      if(p.weapon === 'minigun' && minigunSpritesLoaded === minigunFrameCount){
+        const currentFrame = minigunSpriteFrames[minigunFrameIndex];
+        if(currentFrame && currentFrame.complete){
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          const w = 64;
+          const h = 64;
+          ctx.drawImage(currentFrame, -w/2, -h/2, w, h);
+          ctx.restore();
+          drewSprite = true;
+        }
+      } else if(p.weapon === 'minigun'){
+        // Minigun weapon but sprites not loaded - use normal animation
+        drewSprite = animController.draw(ctx, p.x, p.y, 1.21);
+      } else if(p.characterId === 'tank'){
+        ctx.save();
+        ctx.filter = 'hue-rotate(25deg) saturate(0.6) brightness(0.9)';
+        drewSprite = animController.draw(ctx, p.x, p.y, 1.21);
+        ctx.restore();
+      } else {
+        drewSprite = animController.draw(ctx, p.x, p.y, 1.21);
+      }
     }catch(e){
       // Silent fail, use fallback
     }
@@ -2043,6 +2387,28 @@ function update(dt){
       networkSyncTimer = 0;
       sendGameState();
     }
+    
+    // Update player position interpolation and check for disconnections
+    const now = Date.now();
+    multiplayerPlayers.forEach(mp => {
+      // Apply position interpolation
+      interpolatePlayerPosition(mp, dt);
+      
+      // Check for connection timeout (no update for 10 seconds)
+      if (mp.lastUpdateTime && (now - mp.lastUpdateTime) > 10000) {
+        if (playerConnectionStatus[mp.id]) {
+          playerConnectionStatus[mp.id].connected = false;
+        }
+      }
+    });
+    
+    // Periodic connection check
+    if (!window._lastConnectionCheck) window._lastConnectionCheck = 0;
+    window._lastConnectionCheck += dt;
+    if (window._lastConnectionCheck >= 2.0) {
+      window._lastConnectionCheck = 0;
+      checkPlayerConnections();
+    }
   }
   
   // Broadcast score in co-op mode every second (legacy - replaced by sendGameState)
@@ -2155,7 +2521,6 @@ function update(dt){
     } else if(player.characterId === 'glass_cannon' && window.glassCannonAnimController){
       animController = window.glassCannonAnimController;
     } else if(player.characterId === 'tank' && window.playerAnimController){
-      // Tank uses player animations
       animController = window.playerAnimController;
     }
     
@@ -2163,9 +2528,18 @@ function update(dt){
       const isFiring = player.fireTimer <= 0;
       animController.update(dt, vx, vy, isFiring);
     }
+    
+    // Update minigun animation
+    if(player.weapon === 'minigun'){
+      minigunFrameTimer += dt;
+      if(minigunFrameTimer >= 0.1){ // 10 FPS
+        minigunFrameTimer = 0;
+        minigunFrameIndex = (minigunFrameIndex + 1) % minigunFrameCount;
+      }
+    }
   }catch(e){}
   
-  // Update multiplayer player animations
+  // Update multiplayer player animations and respawn timers
   if (window.isCoopMode && window.playerAnimController && window.playerAnimController.enabled) {
     multiplayerPlayers.forEach(mp => {
       if (!mp.animController) {
@@ -2173,6 +2547,15 @@ function update(dt){
       }
       if (mp.animController) {
         updateMultiplayerAnimation(mp.animController, dt, mp.vx || 0, mp.vy || 0);
+      }
+      
+      // Update respawn timer for dead players
+      if (mp.isDead && mp.respawnTimer > 0) {
+        mp.respawnTimer -= dt;
+        if (mp.respawnTimer <= 0) {
+          mp.isDead = false;
+          mp.health = mp.maxHealth || 100;
+        }
       }
     });
   }
@@ -2326,7 +2709,13 @@ function update(dt){
         player.fireTimer = player.fireRate;
         beep(1000, 0.06, 'square');
       } else if(player.weapon === 'minigun'){
-        const proj = new Projectile(player.x, player.y, ax * 420, ay * 420, 'bullet', Math.round(player.damage));
+        // Offset projectile to spawn from gun barrel (gun points south)
+        const gunOffsetX = 24; // Gun barrel is to the right when facing south
+        const gunOffsetY = 0;
+        const spawnX = player.x + gunOffsetX;
+        const spawnY = player.y + gunOffsetY;
+        
+        const proj = new Projectile(spawnX, spawnY, ax * 420, ay * 420, 'bullet', Math.round(player.damage));
         projectiles.push(proj);
         if (window.isCoopMode && window.networkManager) {
           window.networkManager.broadcastProjectileSpawn(proj);
@@ -2544,18 +2933,26 @@ function update(dt){
       explodeSound();
       enemies.splice(i, 1);
       if(player.health <= 0){
+        player.isDead = true;
         running = false;
         if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
-        startScreen.style.display = 'flex';
+        // Show game over screen
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        if(gameOverScreen) {
+          gameOverScreen.style.display = 'flex';
+          document.getElementById('finalScore').textContent = score;
+          document.getElementById('finalCombo').textContent = window.highestCombo || comboCount;
+        }
+        // Hide HUD and start screen
+        if(startScreen) startScreen.style.display = 'none';
+        if(document.getElementById('hud')) document.getElementById('hud').style.display = 'none';
         saveHighScore('Player', score, gameTime, wave);
         if(leaderboardList) renderLeaderboard(leaderboardList);
-        
         // Check for stage unlocks
         const currentStage = window.currentStage || 1;
         if (wave > maxWavesReached[currentStage]) {
           maxWavesReached[currentStage] = wave;
         }
-        
         // Unlock next stage if reached 20 waves
         if (wave >= 20 && currentStage < 3) {
           unlockedStages[currentStage + 1] = true;
@@ -2702,6 +3099,7 @@ function update(dt){
       enemyProjectiles.splice(i, 1);
       
       if(player.health <= 0){
+        player.isDead = true;
         running = false;
         if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
         startScreen.style.display = 'flex';
@@ -2727,11 +3125,6 @@ function update(dt){
       continue;
     }
     if(Math.hypot(u.x - player.x, u.y - player.y) < u.radius + player.radius){
-      // Broadcast powerup collection in co-op
-      if (window.isCoopMode && window.networkManager) {
-        window.networkManager.broadcastPowerupCollect(u.id, window.networkManager.localPlayerId);
-      }
-      
       // Activate powerup for configured duration
       const dur = POWERUP_DURATION; // seconds
       player.activePowerups = player.activePowerups || {};
@@ -2766,6 +3159,16 @@ function update(dt){
       } else {
         const duration = u.type === 'x2score' ? 30 : dur; // x2score lasts 30 seconds
         player.activePowerups[u.type] = duration;
+        
+        // Track powerup collection in co-op mode
+        if (window.isCoopMode && window.networkManager) {
+          u.collectedBy = window.networkManager.localPlayerId;
+          u.collectionTime = Date.now();
+          
+          // Notify other players about the collection
+          window.networkManager.broadcastPowerupCollect(u.id, window.networkManager.localPlayerId);
+        }
+        
         // apply immediate effect
         if(u.type === 'minigun'){ player.weapon = 'minigun'; player.weapons.minigun = true; }
         else if(u.type === 'rocket'){ player.weapon = 'rocket'; player.weapons.rocket = true; }
@@ -2994,6 +3397,8 @@ function update(dt){
 }
 
 function draw(){
+  if (!ctx || !canvas) return; // Guard against missing canvas/context
+  
   // Draw tiled background
   if(backgroundLoaded){
     const tileW = backgroundImage.width;
@@ -3012,10 +3417,16 @@ function draw(){
   }
   
   gems.forEach(g=>{
-    ctx.fillStyle = '#8fffa0';
-    ctx.beginPath();
-    ctx.arc(g.x, g.y, g.radius, 0, Math.PI*2);
-    ctx.fill();
+    if(gemImageLoaded && gemImage.complete){
+      const size = g.radius * 5; // 200% bigger (was 2.5, now 5)
+      ctx.drawImage(gemImage, g.x - size/2, g.y - size/2, size, size);
+    } else {
+      // Fallback to circle
+      ctx.fillStyle = '#8fffa0';
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, g.radius, 0, Math.PI*2);
+      ctx.fill();
+    }
   });
   
   // Draw hearts
@@ -3157,6 +3568,13 @@ function draw(){
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius * 1.5, 0, Math.PI*2);
       ctx.fill();
+    } else if(p.type === 'bullet' && bulletSpritesLoaded === bulletFrameCount){
+      // Draw bullet sprite (static first frame to avoid glitches)
+      const bulletSprite = bulletSpriteFrames[0];
+      if(bulletSprite && bulletSprite.complete){
+        const size = 24; // Bullet sprite size (enlarged for visibility)
+        ctx.drawImage(bulletSprite, p.x - size/2, p.y - size/2, size, size);
+      }
     } else {
       // Fallback to simple circle rendering
       ctx.fillStyle = p.type === 'rocket' ? '#ff9e4a' : p.type === 'fireball' ? '#ff6600' : '#fff7b2';
@@ -3246,18 +3664,33 @@ function draw(){
   // Draw other players in co-op mode
   if (window.isCoopMode && multiplayerPlayers.length > 0) {
     multiplayerPlayers.forEach(mp => {
-      if (!mp.x || !mp.y) return; // Skip if no position data yet
+      if (!mp || mp.x === undefined || mp.y === undefined) return; // Skip if no position data yet
+      
+      // Skip rendering dead players until respawn
+      if (mp.isDead) {
+        // Draw death marker
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+        ctx.fillRect(mp.x - 20, mp.y - 20, 40, 40);
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(mp.x - 20, mp.y - 20, 40, 40);
+        
+        // Draw respawn timer if available
+        if (mp.respawnTimer > 0) {
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 14px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('Respawn: ' + Math.ceil(mp.respawnTimer), mp.x, mp.y);
+        }
+        return;
+      }
       
       // Try to draw sprite first, fallback to circle if sprite not available
       const drewSprite = drawMultiplayerPlayerSprite(ctx, mp);
       
       if (!drewSprite) {
-        // Fallback: Draw player as colored circle with name
-        const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0'];
-        const colorIndex = Math.abs(mp.id.charCodeAt(0)) % colors.length;
-        
-        // Player circle
-        ctx.fillStyle = colors[colorIndex];
+        // Fallback: Draw player as colored circle with assigned color
+        ctx.fillStyle = mp.color || '#4da6ff';
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -3266,26 +3699,53 @@ function draw(){
         ctx.stroke();
       }
       
-      // Player name (always draw above sprite or circle)
+      // Player name and role (always draw above sprite or circle)
       ctx.fillStyle = '#fff';
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 2;
       ctx.font = 'bold 12px Arial';
       ctx.textAlign = 'center';
-      ctx.strokeText(mp.name || 'Player', mp.x, mp.y - 40);
-      ctx.fillText(mp.name || 'Player', mp.x, mp.y - 40);
+      const roleLabel = mp.isHost ? ' (H)' : ' (C)';
+      const playerName = mp.name || 'Player';
+      ctx.strokeText(playerName + roleLabel, mp.x, mp.y - 40);
+      ctx.fillText(playerName + roleLabel, mp.x, mp.y - 40);
       
-      // Health bar
-      if (mp.health > 0) {
-        const barWidth = 40;
-        const barHeight = 4;
-        const healthPercent = Math.max(0, Math.min(1, mp.health / 20)); // Assume max 20 health
+      // Connection status indicator
+      const isConnected = playerConnectionStatus[mp.id]?.connected ?? true;
+      if (!isConnected) {
+        ctx.fillStyle = '#FF0000';
+        ctx.font = '10px Arial';
+        ctx.strokeText('DISCONNECTED', mp.x, mp.y - 25);
+        ctx.fillText('DISCONNECTED', mp.x, mp.y - 25);
+      }
+      
+      // Health bar with color coded background
+      if (mp.health !== undefined && mp.health > 0) {
+        const barWidth = 50;
+        const barHeight = 5;
+        const maxHealth = mp.maxHealth || 100;
+        const healthPercent = Math.max(0, Math.min(1, mp.health / maxHealth));
         
+        // Background
         ctx.fillStyle = '#333';
-        ctx.fillRect(mp.x - barWidth/2, mp.y + 35, barWidth, barHeight);
+        ctx.fillRect(mp.x - barWidth/2, mp.y + 32, barWidth, barHeight);
         
-        ctx.fillStyle = healthPercent > 0.5 ? '#4CAF50' : healthPercent > 0.25 ? '#FFC107' : '#F44336';
-        ctx.fillRect(mp.x - barWidth/2, mp.y + 35, barWidth * healthPercent, barHeight);
+        // Health bar color based on health
+        if (healthPercent > 0.6) {
+          ctx.fillStyle = '#4CAF50'; // Green
+        } else if (healthPercent > 0.3) {
+          ctx.fillStyle = '#FFC107'; // Yellow
+        } else {
+          ctx.fillStyle = '#F44336'; // Red
+        }
+        ctx.fillRect(mp.x - barWidth/2, mp.y + 32, barWidth * healthPercent, barHeight);
+        
+        // Health text
+        ctx.fillStyle = '#fff';
+        ctx.font = '9px Arial';
+        ctx.textAlign = 'center';
+        const displayHealth = Math.max(0, Math.ceil(mp.health));
+        ctx.fillText(displayHealth + '/' + maxHealth, mp.x, mp.y + 44);
       }
     });
   }
@@ -3496,52 +3956,69 @@ function draw(){
 
   // Draw multiplayer scoreboard in co-op mode
   if (window.isCoopMode && multiplayerPlayers.length > 0) {
-    const sbX = W - 250; // Top right corner
+    const sbX = W - 280; // Top right corner
     const sbY = 15;
-    const sbWidth = 230;
-    const lineHeight = 35;
-    const sbHeight = 20 + (multiplayerPlayers.length + 1) * lineHeight; // +1 for local player
+    const sbWidth = 260;
+    const lineHeight = 38;
+    const sbHeight = 30 + (multiplayerPlayers.length + 1) * lineHeight; // +1 for local player
     
     // Semi-transparent background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.fillRect(sbX, sbY, sbWidth, sbHeight);
     
-    // Border
-    ctx.strokeStyle = '#4da6ff';
+    // Border with player count
+    const connectedCount = multiplayerPlayers.filter(p => playerConnectionStatus[p.id]?.connected ?? true).length;
+    ctx.strokeStyle = connectedCount === multiplayerPlayers.length ? '#00FF00' : '#FFaa00';
     ctx.lineWidth = 2;
     ctx.strokeRect(sbX, sbY, sbWidth, sbHeight);
     
-    // Title
+    // Title with player count
     ctx.fillStyle = '#ffff00';
-    ctx.font = 'bold 16px Arial';
+    ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'left';
-    ctx.fillText('CO-OP SCOREBOARD', sbX + 10, sbY + 20);
+    ctx.fillText(`CO-OP (${connectedCount}/${multiplayerPlayers.length + 1})`, sbX + 10, sbY + 18);
     
     // Local player (you)
     ctx.fillStyle = '#00ff88';
-    ctx.font = 'bold 14px Arial';
+    ctx.font = 'bold 13px Arial';
     const localName = window.discordAuth?.user?.username || 'You';
-    ctx.fillText(`${localName} (You)`, sbX + 10, sbY + 20 + lineHeight);
-    ctx.fillStyle = '#fff';
-    ctx.textAlign = 'right';
-    ctx.fillText(`${score}`, sbX + sbWidth - 10, sbY + 20 + lineHeight);
+    const isLocalHost = window.networkManager?.isHost ?? false;
+    const localRole = isLocalHost ? '(H)' : '(C)';
+    ctx.fillText(`${localName} ${localRole}`, sbX + 10, sbY + 20 + lineHeight);
     
-    // Other players
-    multiplayerPlayers.sort((a, b) => b.score - a.score); // Sort by score descending
-    multiplayerPlayers.forEach((player, idx) => {
+    // Local player score and health
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'right';
+    const playerHealth = Math.max(0, Math.ceil(player.health));
+    ctx.fillText(`${score} | ${playerHealth}/${player.maxHealth}`, sbX + sbWidth - 10, sbY + 20 + lineHeight);
+    
+    // Other players sorted by score
+    multiplayerPlayers.sort((a, b) => b.score - a.score);
+    multiplayerPlayers.forEach((p, idx) => {
       const yPos = sbY + 20 + (idx + 2) * lineHeight;
       
-      // Player name
-      ctx.fillStyle = '#4da6ff';
-      ctx.font = '14px Arial';
-      ctx.textAlign = 'left';
-      const displayName = player.name.length > 15 ? player.name.substring(0, 15) + '...' : player.name;
-      ctx.fillText(displayName, sbX + 10, yPos);
+      // Player color indicator
+      ctx.fillStyle = p.color;
+      ctx.fillRect(sbX + 8, yPos - 12, 8, 8);
       
-      // Player score
+      // Player name with role
+      const isConnected = playerConnectionStatus[p.id]?.connected ?? true;
+      ctx.fillStyle = isConnected ? '#4da6ff' : '#FF6666';
+      ctx.font = isConnected ? '13px Arial' : '12px Arial';
+      ctx.textAlign = 'left';
+      const roleText = p.isHost ? '(H)' : '(C)';
+      const displayName = p.name.length > 12 ? p.name.substring(0, 12) + '..' : p.name;
+      ctx.fillText(`${displayName} ${roleText}`, sbX + 22, yPos);
+      
+      // Player score and ping
       ctx.fillStyle = '#fff';
+      ctx.font = '11px Arial';
       ctx.textAlign = 'right';
-      ctx.fillText(`${player.score}`, sbX + sbWidth - 10, yPos);
+      const pingDisplay = p.ping > 0 ? ` ${p.ping}ms` : '';
+      const playerHealth = Math.max(0, Math.ceil(p.health));
+      const playerMaxHealth = p.maxHealth || 100;
+      ctx.fillText(`${p.score} | ${playerHealth}/${playerMaxHealth}${pingDisplay}`, sbX + sbWidth - 10, yPos);
     });
     
     // Reset text alignment

@@ -526,8 +526,11 @@ class NetworkManager {
       position: playerData.position,
       velocity: playerData.velocity,
       health: playerData.health,
+      maxHealth: playerData.maxHealth,
       score: playerData.score,
-      timestamp: Date.now()
+      timestamp: playerData.timestamp || Date.now(),
+      isDead: playerData.isDead || false,
+      character: playerData.character
     };
 
     if (this.isHost) {
