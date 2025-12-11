@@ -1,9 +1,8 @@
 // Red Alien enemy animation loader for directional sprites
 // Supports 8-directional walking and throwing animations
 
-(function(){
+(function() {
   'use strict';
-  console.log('📦 Loading redalien-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -29,7 +28,7 @@
 
   // Red Alien animation state manager
   class RedAlienAnimationController {
-    constructor(basePath = '/animations/redalien'){
+    constructor(basePath = './animations/redalien'){
       this.basePath = basePath;
       this.sprites = {}; // animType_direction -> { frames: [Image], frameW, frameH, loaded }
       this.enabled = false; // disabled until sprites load
@@ -48,6 +47,9 @@
       const frames = [];
       let loadedFrames = 0;
       
+      // Create sprite entry FIRST so callbacks can access it
+      this.sprites[key] = { frames, frameW, frameH, loaded: false };
+      
       this.totalToLoad += frameCount;
       
       for(let i = 0; i < frameCount; i++){
@@ -59,7 +61,7 @@
           loadedFrames++;
           this.loadedCount++;
           if(loadedFrames === frameCount){
-            this.sprites[key] = { frames, frameW, frameH, loaded: true };
+            this.sprites[key].loaded = true;
           }
           if(this.loadedCount === this.totalToLoad){
             this.enabled = true;
@@ -75,6 +77,9 @@
         img.src = path;
         frames.push(img);
       }
+      
+      // Update frames array
+      this.sprites[key].frames = frames;
     }
 
     // Initialize all animations
@@ -151,10 +156,7 @@
   // Create global controller
   const controller = new RedAlienAnimationController();
   controller.init();
-  controller.loadAll();
   
   // Export to window
   window.redAlienAnimController = controller;
-  
-  console.log('Red Alien animation controller initialized and loading...');
 })();

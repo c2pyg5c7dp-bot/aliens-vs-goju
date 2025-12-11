@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Game Status</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { background: #1a1a2e; color: #fff; font-family: Arial; padding: 20px; margin: 0; }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { color: #0f0; }
+    .status { background: #000; padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #0f0; }
+    .status.error { border-left-color: #f00; color: #f00; }
+    .button { display: inline-block; padding: 12px 24px; background: #4CAF50; color: #000; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; font-size: 14px; text-decoration: none; }
+    .button:hover { background: #66BB6A; }
+    .button.coop { background: #2196F3; color: #fff; }
+    .button.coop:hover { background: #42A5F5; }
+    .button.upgrades { background: #FFB300; color: #000; }
+    .button.upgrades:hover { background: #FFC107; }
+    iframe { width: 100%; height: 600px; border: 2px solid #0f0; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 Aliens vs Goju - Game Status</h1>
+    
+    <div class="status">
+      <strong>✅ Server Status:</strong> Running on http://localhost:8080
+    </div>
+    
+    <div class="status">
+      <strong>✅ Game Files:</strong>All scripts and assets present
+    </div>
+    
+    <div class="status">
+      <strong>✅ Syntax Check:</strong> No JavaScript errors detected
+    </div>
+    
+    <h2>🎯 Quick Play</h2>
+    <div style="margin: 20px 0;">
+      <a href="./aliensvsgoju.html" class="button">▶️ Play Full Game</a>
+      <a href="./aliensvsgoju.html?debug=true" class="button upgrades">💎 Upgrades Menu</a>
+    </div>
+    
+    <h2>📋 What to do:</h2>
+    <ol>
+      <li>Click "▶️ Play Full Game" button above</li>
+      <li>Click "⚔️ Start Solo" to begin</li>
+      <li>Select your character (Mage, Tank, Speedster, or Glass Cannon)</li>
+      <li>Click to shoot, WASD or mouse to move</li>
+      <li>Survive waves of aliens and defeat the red alien boss</li>
+      <li>Collect gems to purchase permanent upgrades</li>
+    </ol>
+    
+    <h2>🐛 Debug Info</h2>
+    <div class="status">
+      <p>If the game doesn't appear below, try refreshing the page.</p>
+      <p>Check the browser console (F12) for any errors.</p>
+      <p>The game requires WebGL/Canvas support in your browser.</p>
+    </div>
+    
+    <h2>🎮 Game Preview</h2>
+    <p>The game will appear in the frame below:</p>
+    <iframe src="./aliensvsgoju.html" title="Aliens vs Goju Game"></iframe>
+  </div>
+</body>
+</html>

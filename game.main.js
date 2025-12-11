@@ -1,8 +1,5 @@
 // Aliens vs Goju — A survival game
-// Build version: 2024-12-07-v4
-console.log('🎮 game.v2.js loading...');
-console.log('Build: 2024-12-07-v4');
-console.log('Document ready state:', document.readyState);
+// Build version: 2024-12-09-cleaned
 
 // Update loading screen
 const loadingGame = document.getElementById('loading-game');
@@ -20,9 +17,7 @@ const ctx = canvas?.getContext('2d');
 if (!ctx) {
   console.error('CRITICAL: Cannot get 2D context!');
   window.debugLog?.('❌ FATAL: Cannot get 2D rendering context');
-  // Return early if no context
 }
-console.log('Canvas initialized successfully', { width: canvas.width, height: canvas.height });
 if (loadingGame) loadingGame.textContent = '✅ Game Engine';
 let DPR = window.devicePixelRatio || 1;
 
@@ -63,12 +58,6 @@ const startBtn = document.getElementById('startBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const restartBtn = document.getElementById('restartBtn');
 
-console.log('UI Elements found:', {
-  startBtn: !!startBtn,
-  pauseBtn: !!pauseBtn,
-  restartBtn: !!restartBtn
-});
-
 if (!startBtn) {
   console.error('CRITICAL: Start button not found!');
   window.debugLog?.('❌ Start button not found - game cannot start');
@@ -96,6 +85,7 @@ const waveEl = document.getElementById('wave');
 let gameState = 'menu'; // 'menu', 'playing', 'paused', 'leaderboard', 'charSelect'
 let running = false, paused = false;
 let score = 0, wave = 0;
+let boss = null; // Current boss (if any)
 let gameTime = 0; // Track elapsed game time in seconds
 let enemies = [], projectiles = [], powerups = [], particles = [], gems = [], hearts = [];
 let enemyProjectiles = []; // Red alien rock projectiles
@@ -152,6 +142,45 @@ function savePermanentUpgrades() {
 
 // Load upgrades on game start
 loadPermanentUpgrades();
+
+// Stage unlock system
+let unlockedStages = {
+  1: true,  // Stage 1 always unlocked
+  2: false,
+  3: false
+};
+let maxWavesReached = {
+  1: 0,
+  2: 0,
+  3: 0
+};
+
+function loadStageProgress() {
+  try {
+    const saved = localStorage.getItem('unlockedStages');
+    if (saved) {
+      unlockedStages = JSON.parse(saved);
+    }
+    const savedWaves = localStorage.getItem('maxWavesReached');
+    if (savedWaves) {
+      maxWavesReached = JSON.parse(savedWaves);
+    }
+  } catch (e) {
+    console.error('Failed to load stage progress:', e);
+  }
+}
+
+function saveStageProgress() {
+  try {
+    localStorage.setItem('unlockedStages', JSON.stringify(unlockedStages));
+    localStorage.setItem('maxWavesReached', JSON.stringify(maxWavesReached));
+  } catch (e) {
+    console.error('Failed to save stage progress:', e);
+  }
+}
+
+// Load stage progress on game start
+loadStageProgress();
 
 // Multiplayer player tracking
 let multiplayerPlayers = []; // Array of {id, name, score, character, position, health, vx, vy, animController}
@@ -247,7 +276,6 @@ function drawMultiplayerPlayerSprite(ctx, mp) {
     
     return true;
   } catch (e) {
-    console.warn('Failed to draw multiplayer player sprite:', e);
     return false;
   }
 }
@@ -321,7 +349,6 @@ if (window.networkManager) {
   
   // Handle wave spawn from host
   window.networkManager.onSpawnWave = (waveNum, enemyData) => {
-    console.log(`📥 Received wave ${waveNum} with ${enemyData.length} enemies`);
     wave = waveNum;
     waveInProgress = true;
     
@@ -344,7 +371,6 @@ if (window.networkManager) {
       }
     });
     
-    console.log(`✅ Spawned ${enemyData.length} enemies for wave ${waveNum}`);
   };
   
   // Handle powerup spawn from host
@@ -352,7 +378,6 @@ if (window.networkManager) {
     const p = new PowerUp(powerupData.x, powerupData.y, powerupData.type, powerupData.id);
     p.life = powerupData.life;
     powerups.push(p);
-    console.log(`📥 Received powerup: ${powerupData.type} at (${powerupData.x}, ${powerupData.y})`);
   };
   
   // Handle powerup collection
@@ -360,7 +385,6 @@ if (window.networkManager) {
     const idx = powerups.findIndex(p => p.id === powerupId);
     if (idx >= 0) {
       powerups.splice(idx, 1);
-      console.log(`🎁 Player ${playerId} collected powerup ${powerupId}`);
     }
   };
   
@@ -371,7 +395,6 @@ if (window.networkManager) {
     
     const p = new Projectile(projData.x, projData.y, projData.vx, projData.vy, projData.type, projData.damage, projData.id);
     projectiles.push(p);
-    console.log(`💥 Player ${projData.playerId} fired ${projData.type}`);
   };
   
   // Handle enemy damage
@@ -379,7 +402,6 @@ if (window.networkManager) {
     const enemy = enemies.find(e => e.id === enemyId);
     if (enemy) {
       enemy.hp -= damage;
-      console.log(`🎯 Enemy ${enemyId} took ${damage} damage from ${playerId}`);
     }
   };
   
@@ -388,13 +410,11 @@ if (window.networkManager) {
     const idx = enemies.findIndex(e => e.id === enemyId);
     if (idx >= 0) {
       enemies.splice(idx, 1);
-      console.log(`💀 Enemy ${enemyId} killed by ${killerId}`);
     }
   };
   
   // Handle request for game state (late join)
   window.networkManager.onRequestGameState = () => {
-    console.log('📤 Collecting game state for late joiner');
     return {
       waveNumber: waveNumber,
       enemies: enemies.map(e => ({
@@ -434,7 +454,6 @@ if (window.networkManager) {
   
   // Handle received game state snapshot (late join)
   window.networkManager.onGameStateSnapshot = (gameState) => {
-    console.log('📥 Restoring game state from snapshot', gameState);
     
     // Restore wave number
     waveNumber = gameState.waveNumber || 0;
@@ -497,7 +516,6 @@ if (window.networkManager) {
       });
     }
     
-    console.log(`✅ Game state restored: Wave ${waveNumber}, ${enemies.length} enemies, ${powerups.length} powerups`);
   };
 }
 
@@ -885,6 +903,184 @@ class Heart {
     this.radius = 8;
     this.life = 15; // Lives longer than gems
     this.healAmount = 4;
+  }
+}
+
+class Boss {
+  constructor(x, y){
+    this.x = x; this.y = y;
+    this.radius = 50; // Large boss enemy
+    this.hp = 10000; // High health
+    this.maxHp = 10000;
+    this.speed = 96; // 20% faster (80 * 1.2)
+    this.vx = 0; this.vy = 0;
+    
+    // Attack patterns
+    this.attackCooldown = 0;
+    this.attackType = 'spinning'; // 'spinning' or 'smash'
+    this.isAttacking = false;
+    this.attackTimer = 0;
+    this.attackDuration = 1.2; // Duration of attack animation
+    
+    // Invincibility shield (10% of fight time)
+    this.isInvincible = false;
+    this.invincibilityTimer = 0;
+    this.invincibilityCooldown = 15; // Start with 15 second delay before first shield
+    this.invincibilityDuration = 3; // 3 seconds of invincibility
+    this.invincibilityCooldownTime = 30; // 30 seconds between shields (10% uptime)
+    
+    // Spinning boulder attack
+    this.spinAngle = 0;
+    this.spinSpeed = 8; // Radians per frame
+    this.spinningBoulders = []; // Array of boulders spinning around boss
+    
+    // Smash attack
+    this.smashRange = 150;
+    this.smashDamage = 40;
+    this.hasSmashed = false; // Track if smash damage was dealt this attack
+    
+    // Scale
+    this.scale = 6; // Much larger than regular enemies
+    
+    // Animation (if available)
+    try {
+      if(window.golemAnimController){
+        this.animInstance = window.golemAnimController.createInstance();
+      }
+    } catch(e) {}
+  }
+  
+  update(dt, playerX, playerY, allBosses){
+    // Update invincibility
+    if(this.isInvincible){
+      this.invincibilityTimer -= dt;
+      if(this.invincibilityTimer <= 0){
+        this.isInvincible = false;
+        this.invincibilityCooldown = this.invincibilityCooldownTime;
+      }
+    } else if(this.invincibilityCooldown > 0){
+      this.invincibilityCooldown -= dt;
+      if(this.invincibilityCooldown <= 0){
+        this.isInvincible = true;
+        this.invincibilityTimer = this.invincibilityDuration;
+      }
+    }
+    
+    // Move towards player
+    const dx = playerX - this.x;
+    const dy = playerY - this.y;
+    const dist = Math.hypot(dx, dy);
+    
+    if(dist > 0){
+      const moveSpeed = Math.min(this.speed, dist / (dt * 2)); // Smooth movement
+      this.vx = (dx / dist) * moveSpeed;
+      this.vy = (dy / dist) * moveSpeed;
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+    }
+    
+    // Keep boss in bounds
+    this.x = Math.max(this.radius, Math.min(W - this.radius, this.x));
+    this.y = Math.max(this.radius, Math.min(H - this.radius, this.y));
+    
+    // Cooldown management
+    if(this.attackCooldown > 0) this.attackCooldown -= dt;
+    
+    // Attack patterns
+    if(!this.isAttacking && this.attackCooldown <= 0 && dist < 600){
+      // Choose attack type randomly
+      this.attackType = Math.random() < 0.6 ? 'spinning' : 'smash';
+      this.isAttacking = true;
+      this.attackTimer = 0;
+      this.hasSmashed = false;
+      this.spinAngle = 0;
+      this.spinningBoulders = [];
+      this.attackCooldown = 3; // 3 second cooldown between attacks
+    }
+    
+    // Execute attack
+    if(this.isAttacking){
+      this.attackTimer += dt;
+      
+      if(this.attackType === 'spinning'){
+        this.spinAngle += this.spinSpeed * dt;
+        
+        // Spawn boulders in a circle around boss
+        if(this.spinningBoulders.length < 6){
+          for(let i = 0; i < 6; i++){
+            const angle = (i / 6) * Math.PI * 2 + this.spinAngle;
+            const bx = this.x + Math.cos(angle) * 120;
+            const by = this.y + Math.sin(angle) * 120;
+            const bvx = Math.cos(angle) * 200;
+            const bvy = Math.sin(angle) * 200;
+            
+            this.spinningBoulders.push({
+              x: bx, y: by,
+              vx: bvx, vy: bvy,
+              radius: 12,
+              damage: 15,
+              life: 3,
+              angle: angle
+            });
+          }
+        }
+        
+        // Update spinning boulders
+        for(let i = this.spinningBoulders.length - 1; i >= 0; i--){
+          const boulder = this.spinningBoulders[i];
+          boulder.x += boulder.vx * dt;
+          boulder.y += boulder.vy * dt;
+          boulder.life -= dt;
+          
+          if(boulder.life <= 0){
+            this.spinningBoulders.splice(i, 1);
+          }
+        }
+        
+        if(this.attackTimer > this.attackDuration){
+          this.isAttacking = false;
+        }
+      } else if(this.attackType === 'smash'){
+        // Smash attack: unleash shockwave in all directions
+        if(!this.hasSmashed && this.attackTimer > 0.4){
+          this.hasSmashed = true;
+          
+          // Create 8 boulders in all directions
+          for(let i = 0; i < 8; i++){
+            const angle = (i / 8) * Math.PI * 2;
+            const bx = this.x + Math.cos(angle) * 40;
+            const by = this.y + Math.sin(angle) * 40;
+            const bvx = Math.cos(angle) * 250;
+            const bvy = Math.sin(angle) * 250;
+            
+            this.spinningBoulders.push({
+              x: bx, y: by,
+              vx: bvx, vy: bvy,
+              radius: 14,
+              damage: 25,
+              life: 3.5,
+              angle: angle
+            });
+          }
+        }
+        
+        // Update smash boulders
+        for(let i = this.spinningBoulders.length - 1; i >= 0; i--){
+          const boulder = this.spinningBoulders[i];
+          boulder.x += boulder.vx * dt;
+          boulder.y += boulder.vy * dt;
+          boulder.life -= dt;
+          
+          if(boulder.life <= 0){
+            this.spinningBoulders.splice(i, 1);
+          }
+        }
+        
+        if(this.attackTimer > this.attackDuration){
+          this.isAttacking = false;
+        }
+      }
+    }
   }
 }
 
@@ -1280,12 +1476,21 @@ function renderLeaderboard(el){ const list = getHighScores(); if(!el) return; el
 function startWave(){
   // In co-op mode, only host spawns enemies
   if (window.isCoopMode && window.networkManager && !window.networkManager.isHost) {
-    console.log('⏳ Waiting for host to spawn wave...');
     return; // Clients wait for host
   }
   
   // Start a wave using the current `wave` number for scaling
   const spawnWaveNum = Math.max(1, wave || 1);
+  
+  // Boss fight at wave 20
+  if(spawnWaveNum === 20){
+    waveInProgress = true;
+    boss = new Boss(W / 2, H / 2 - 100);
+    return; // Skip normal enemy spawning
+  }
+  
+  // Clear boss if moving to next wave after defeating it
+  boss = null;
   waveInProgress = true;
   // Non-linear (exponential) enemy count scaling.
   // basePerWave: enemies on wave 1; growth: per-wave multiplier (>1 for increasing difficulty)
@@ -1396,7 +1601,6 @@ function startWave(){
   
   // Spawn Red Alien enemies starting at wave 5, then every wave after wave 10
   if(spawnWaveNum === 5 || spawnWaveNum >= 10){
-    console.log('Spawning Red Aliens for wave', spawnWaveNum);
     for(let i = 0; i < 2; i++){
       let x, y;
       const side = Math.random();
@@ -1418,7 +1622,6 @@ function startWave(){
       redAlien.speed = 60; // Slower movement
       redAlien.radius = Math.max(6, Math.round(redAlien.radius * (1 + spawnWaveNum * 0.04)));
       
-      console.log('Created Red Alien:', redAlien);
       
       if(useSpawnQueue){
         spawnQueue.push(redAlien);
@@ -1432,7 +1635,6 @@ function startWave(){
   if (window.isCoopMode && window.networkManager && window.networkManager.isHost) {
     const allEnemies = useSpawnQueue ? spawnQueue : enemies;
     window.networkManager.broadcastWaveSpawn(spawnWaveNum, allEnemies);
-    console.log(`📡 Broadcast wave ${spawnWaveNum} with ${allEnemies.length} enemies`);
   }
 }
 
@@ -1446,6 +1648,7 @@ function resetGame(){
   spawnQueue.length = 0; spawnTimer = 0;
   score = 0; nextWaveIndex = 0;
   gameTime = 0; // Reset game timer
+  boss = null; // Clear boss
   // do not auto-start waves here (tests expect resetGame to clear state without spawning)
   wave = 0;
   // stop running until explicitly started by UI
@@ -1532,10 +1735,6 @@ function startNextWave(){
 
 // Controls
 function startGameFromUI(){
-  console.log('🚀 startGameFromUI called');
-  console.log('Current gameState:', gameState);
-  console.log('startScreen element:', document.getElementById('startScreen'));
-  console.log('charSelectScreen element:', document.getElementById('charSelectScreen'));
   
   gameState = 'charSelect';
   const startScreen = document.getElementById('startScreen');
@@ -1543,24 +1742,29 @@ function startGameFromUI(){
   
   if (startScreen) {
     startScreen.style.display = 'none';
-    console.log('✅ Start screen hidden');
   } else {
     console.error('❌ Start screen element not found!');
   }
   
   if (charSelectScreen) {
     charSelectScreen.style.display = 'flex';
-    console.log('✅ Character select screen shown');
   } else {
     console.error('❌ Character select screen element not found!');
   }
 }
 
 function startGameWithCharacter(charId){
-  console.log('startGameWithCharacter called with:', charId);
   selectedCharacter = charId;
-  gameState = 'playing';
+  gameState = 'charSelect'; // Stay in select mode
   document.getElementById('charSelectScreen').style.display = 'none';
+  document.getElementById('stageSelectScreen').style.display = 'flex';
+}
+
+// Start game with selected character and stage
+function startGameWithStage(stageNum){
+  gameState = 'playing';
+  window.currentStage = stageNum;
+  document.getElementById('stageSelectScreen').style.display = 'none';
   resetGame();
   // spawn first wave when the player actually starts the game
   wave = 1;
@@ -1568,12 +1772,11 @@ function startGameWithCharacter(charId){
   running = true;
   // start loop if not already running
   if(rafId === null) rafId = requestAnimationFrame(loop);
-  console.log('Game started with character:', charId);
 }
 
 // Expose to window for main.js to call
 window.startGameWithCharacter = startGameWithCharacter;
-console.log('startGameWithCharacter exposed to window');
+window.startGameWithStage = startGameWithStage;
 
 function startGame(){
   gameState = 'playing';
@@ -1587,11 +1790,9 @@ function startGame(){
 }
 
 startBtn.addEventListener('click', startGameFromUI);
-console.log('Start button click listener added');
 
 // Character selection handlers
 const characterCards = document.querySelectorAll('.character-card-modern');
-console.log('Found character cards:', characterCards.length);
 characterCards.forEach(card => {
   card.addEventListener('click', () => {
     // Remove selected class from all cards
@@ -1600,13 +1801,76 @@ characterCards.forEach(card => {
     card.classList.add('selected');
     
     const charId = card.getAttribute('data-character');
-    console.log('Character card clicked:', charId);
     if (charId) {
       startGameWithCharacter(charId);
     }
   });
 });
-console.log('Character card click listeners added');
+
+// Stage select handlers
+const stageCards = document.querySelectorAll('.stage-select-card');
+stageCards.forEach(card => {
+  card.addEventListener('click', () => {
+    if (card.classList.contains('locked')) return; // Can't click locked stages
+    
+    const stageNum = parseInt(card.getAttribute('data-stage'));
+    if (stageNum) {
+      startGameWithStage(stageNum);
+    }
+  });
+});
+
+// Back to character select button
+const backToCharSelectBtn = document.getElementById('backToCharSelect');
+if (backToCharSelectBtn) {
+  backToCharSelectBtn.addEventListener('click', () => {
+    document.getElementById('stageSelectScreen').style.display = 'none';
+    document.getElementById('charSelectScreen').style.display = 'flex';
+  });
+}
+
+// Update stage select UI to show unlocked/locked status
+function updateStageSelectUI() {
+  const stageCards = document.querySelectorAll('.stage-select-card');
+  stageCards.forEach(card => {
+    const stageNum = parseInt(card.getAttribute('data-stage'));
+    const isUnlocked = unlockedStages[stageNum];
+    
+    if (isUnlocked) {
+      card.classList.remove('locked');
+      card.classList.add('unlocked');
+      const btn = card.querySelector('.stage-play-btn');
+      if (!btn) {
+        const newBtn = document.createElement('button');
+        newBtn.className = 'stage-play-btn';
+        newBtn.textContent = 'PLAY';
+        card.appendChild(newBtn);
+      }
+    } else {
+      card.classList.add('locked');
+      card.classList.remove('unlocked');
+      const btn = card.querySelector('.stage-play-btn');
+      if (btn) btn.remove();
+      
+      // Update unlock requirement text
+      const progressDiv = card.querySelector('.stage-progress');
+      if (progressDiv) {
+        const prevStage = stageNum - 1;
+        const waveReq = 20;
+        const currentWaves = maxWavesReached[prevStage] || 0;
+        progressDiv.innerHTML = `<span id="stage${stageNum}-progress">${currentWaves}</span>/${waveReq}`;
+      }
+    }
+  });
+}
+
+// Update UI when showing stage select
+const originalStartGameWithCharacter = startGameWithCharacter;
+startGameWithCharacter = function(charId) {
+  originalStartGameWithCharacter(charId);
+  // Update stage UI when showing stage select
+  setTimeout(updateStageSelectUI, 50);
+};
 
 if(pauseBtn) pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
 if(restartBtn) restartBtn.addEventListener('click', ()=>{ 
@@ -1634,15 +1898,30 @@ if(clearLeaderboard) clearLeaderboard.addEventListener('click', ()=>{ localStora
 
 // Drawing
 function drawPlayer(ctx, p){
-  // Try to use animated sprite if available - only for 'player' character
+  // Try to use animated sprite if available
   let drewSprite = false;
+  
+  // Select appropriate animation controller based on character
+  let animController = null;
   if(p.characterId === 'player' && window.playerAnimController){
+    animController = window.playerAnimController;
+  } else if(p.characterId === 'speedster' && window.speedsterAnimController){
+    animController = window.speedsterAnimController;
+  } else if(p.characterId === 'glass_cannon' && window.glassCannonAnimController){
+    animController = window.glassCannonAnimController;
+  } else if(p.characterId === 'tank' && window.playerAnimController){
+    // Tank uses player animations but drawn with different color
+    animController = window.playerAnimController;
+  }
+  
+  if(animController){
     try{
-      drewSprite = window.playerAnimController.draw(ctx, p.x, p.y, 1.21);
+      drewSprite = animController.draw(ctx, p.x, p.y, 1.21);
     }catch(e){
       // Silent fail, use fallback
     }
   }
+  
   // Fallback to simple shape if animations not loaded or failed, or for other characters
   if(!drewSprite){
     ctx.save();
@@ -1866,11 +2145,23 @@ function update(dt){
   player.vx = vx;
   player.vy = vy;
 
-  // Update player animation controller
+  // Update player animation controller based on character type
   try{
-    if(window.playerAnimController){
+    let animController = null;
+    if(player.characterId === 'player' && window.playerAnimController){
+      animController = window.playerAnimController;
+    } else if(player.characterId === 'speedster' && window.speedsterAnimController){
+      animController = window.speedsterAnimController;
+    } else if(player.characterId === 'glass_cannon' && window.glassCannonAnimController){
+      animController = window.glassCannonAnimController;
+    } else if(player.characterId === 'tank' && window.playerAnimController){
+      // Tank uses player animations
+      animController = window.playerAnimController;
+    }
+    
+    if(animController){
       const isFiring = player.fireTimer <= 0;
-      window.playerAnimController.update(dt, vx, vy, isFiring);
+      animController.update(dt, vx, vy, isFiring);
     }
   }catch(e){}
   
@@ -1884,6 +2175,67 @@ function update(dt){
         updateMultiplayerAnimation(mp.animController, dt, mp.vx || 0, mp.vy || 0);
       }
     });
+  }
+
+  // Update boss if active
+  if(boss){
+    boss.update(dt, player.x, player.y, boss);
+    
+    // Check projectile hits on boss (only if not invincible)
+    for(let i = projectiles.length - 1; i >= 0; i--){
+      const proj = projectiles[i];
+      const dist = Math.hypot(proj.x - boss.x, proj.y - boss.y);
+      if(dist < boss.radius + proj.radius){
+        if(!boss.isInvincible){
+          boss.hp -= proj.damage;
+          spawnParticles(proj.x, proj.y, '#ffb27f', 8, 100);
+          // Drop gem/heart on hit
+          if(Math.random() < 0.05) gems.push(new Gem(boss.x, boss.y, 5));
+        } else {
+          // Shield deflect effect
+          spawnParticles(proj.x, proj.y, '#00ffff', 12, 150);
+        }
+        projectiles.splice(i, 1);
+      }
+    }
+    
+    // Check boss boulder hits on player
+    if(boss.spinningBoulders){
+      for(let i = boss.spinningBoulders.length - 1; i >= 0; i--){
+        const boulder = boss.spinningBoulders[i];
+        const dist = Math.hypot(boulder.x - player.x, boulder.y - player.y);
+        if(dist < boulder.radius + player.radius){
+          player.health -= boulder.damage;
+          resetCombo();
+          spawnParticles(player.x, player.y, '#ff6b6b', 12, 120);
+          explodeSound();
+          boss.spinningBoulders.splice(i, 1);
+        }
+      }
+    }
+    
+    // Boss defeated
+    if(boss.hp <= 0){
+      score += 1000; // Large reward for defeating boss
+      const bossX = boss.x; // Save position before nullifying
+      const bossY = boss.y;
+      spawnParticles(bossX, bossY, '#ffff00', 40, 200);
+      explodeSound();
+      
+      // Spawn power-ups and gems as reward
+      for(let j = 0; j < 5; j++){
+        const angle = (j / 5) * Math.PI * 2;
+        const r = Math.random();
+        const _pt = r < 0.3 ? 'nuke' : (r < 0.6 ? 'x2score' : 'minigun');
+        const bx = bossX + Math.cos(angle) * 60;
+        const by = bossY + Math.sin(angle) * 60;
+        spawnPowerupWithSync(bx, by, _pt);
+      }
+      
+      boss = null; // Clear boss after using position
+      // Boss defeat triggers wave completion (let normal flow handle reward)
+      waveInProgress = false;
+    }
   }
 
   // Update sword swing if sword is active
@@ -1900,6 +2252,25 @@ function update(dt){
     } else if(player.swordAngle <= -maxAngle){
       player.swordAngle = -maxAngle;
       player.swordSwingDirection = 1;
+    }
+    
+    // Check sword collision with boss
+    if(boss){
+      const swordLength = 90;
+      const swordWidth = 15;
+      const swordX = player.x + Math.cos(player.swordAngle) * swordLength;
+      const swordY = player.y + Math.sin(player.swordAngle) * swordLength;
+      const dist = Math.hypot(swordX - boss.x, swordY - boss.y);
+      if(dist < boss.radius + swordWidth){
+        if(!boss.isInvincible){
+          // Damage boss with sword (not instant kill)
+          boss.hp -= 5; // 5 damage per hit
+          spawnParticles(swordX, swordY, '#ff9b9b', 6, 80);
+        } else {
+          // Shield deflect effect
+          spawnParticles(swordX, swordY, '#00ffff', 8, 100);
+        }
+      }
     }
     
     // Check sword collision with enemies
@@ -1941,7 +2312,9 @@ function update(dt){
     const dx = input.mouseX - player.x;
     const dy = input.mouseY - player.y;
     const dist = Math.hypot(dx, dy);
+    console.log(`[Fire Check] dist=${dist.toFixed(2)}, fireTimer=${player.fireTimer.toFixed(3)}, mouseX=${input.mouseX}, mouseY=${input.mouseY}, playerX=${player.x}, playerY=${player.y}`);
     if(dist > 6){
+      console.log(`[Fire] Creating projectile with weapon=${player.weapon}, damage=${player.damage}`);
       const ax = dx / dist, ay = dy / dist;
       if(player.weapon === 'standard'){
         const proj = new Projectile(player.x, player.y, ax * 380, ay * 380, 'bullet', Math.round(player.damage));
@@ -1996,11 +2369,11 @@ function update(dt){
     }
   }
 
-  // Wave spawning at score thresholds
-  if(nextWaveIndex < waveThresholds.length && score >= waveThresholds[nextWaveIndex]){
-    startWave();
-    nextWaveIndex++;
-  }
+  // Wave spawning at score thresholds (DISABLED - use reward system instead)
+  // if(nextWaveIndex < waveThresholds.length && score >= waveThresholds[nextWaveIndex]){
+  //   startWave();
+  //   nextWaveIndex++;
+  // }
 
   // Update combo timer
   if(comboCount > 0){
@@ -2077,7 +2450,7 @@ function update(dt){
         e.y += e.vy * dt;
       }
     } else if(e.isRedAlien){
-      // Red Alien attack logic - throws rocks
+      // Red Alien attack logic - throws brown boulders
       if(e.attackCooldown > 0){
         e.attackCooldown -= dt;
       }
@@ -2107,20 +2480,23 @@ function update(dt){
       if(e.isAttacking){
         e.attackTimer += dt;
         
-        // Throw rock at mid-point of animation
+        // Throw brown boulder at mid-point of animation
         if(!e.hasThrown && e.attackTimer >= e.attackDuration * 0.5){
           e.hasThrown = true;
-          // Calculate direction to player
-          const rockSpeed = 150; // Slow rock speed
-          const rockVx = (dx / d) * rockSpeed;
-          const rockVy = (dy / d) * rockSpeed;
-          enemyProjectiles.push(new EnemyProjectile(e.x, e.y, rockVx, rockVy, 6)); // 6 damage
+          // Calculate direction to player with physics (gravity/arc)
+          const boulderSpeed = 180; // Fast boulder throw
+          const boulderVx = (dx / d) * boulderSpeed;
+          const boulderVy = (dy / d) * boulderSpeed;
+          // Create a boulder projectile with realistic physics
+          const boulder = new EnemyProjectile(e.x, e.y, boulderVx, boulderVy, 12); // 12 damage (slightly stronger)
+          boulder.radius = 10; // Visible boulder size
+          enemyProjectiles.push(boulder);
         }
         
         // End attack
         if(e.attackTimer >= e.attackDuration){
           e.isAttacking = false;
-          e.attackCooldown = 3.0; // 3 second cooldown
+          e.attackCooldown = 3.5; // 3.5 second cooldown (slightly longer)
           // Switch back to walking animation
           if(e.animInstance){
             e.animInstance.animType = 'scary-walk';
@@ -2173,6 +2549,20 @@ function update(dt){
         startScreen.style.display = 'flex';
         saveHighScore('Player', score, gameTime, wave);
         if(leaderboardList) renderLeaderboard(leaderboardList);
+        
+        // Check for stage unlocks
+        const currentStage = window.currentStage || 1;
+        if (wave > maxWavesReached[currentStage]) {
+          maxWavesReached[currentStage] = wave;
+        }
+        
+        // Unlock next stage if reached 20 waves
+        if (wave >= 20 && currentStage < 3) {
+          unlockedStages[currentStage + 1] = true;
+        }
+        
+        // Save progress
+        saveStageProgress();
       }
     }
   }
@@ -2294,11 +2684,13 @@ function update(dt){
     }
   }
 
-  // Enemy Projectiles (rocks from red aliens)
+  // Enemy Projectiles (brown boulders from red aliens)
   for(let i = enemyProjectiles.length - 1; i >= 0; i--){
     const p = enemyProjectiles[i];
     p.x += p.vx * dt;
     p.y += p.vy * dt;
+    // Apply gravity for realistic physics
+    p.vy += 400 * dt; // Gravity acceleration
     p.life -= dt;
     
     // Check collision with player
@@ -2416,7 +2808,14 @@ function update(dt){
       continue;
     }
     if(Math.hypot(h.x - player.x, h.y - player.y) < h.radius + player.gemPickupRange){
-      player.health = Math.min(player.maxHealth, player.health + h.healAmount);
+      if(player.health >= player.maxHealth){
+        // If health is full, increase max health by 1
+        player.maxHealth += 1;
+        player.health = player.maxHealth;
+      } else {
+        // Otherwise, heal normally
+        player.health = Math.min(player.maxHealth, player.health + h.healAmount);
+      }
       hearts.splice(i, 1);
       beep(1600, 0.08, 'sine');
       spawnParticles(player.x, player.y, '#ff69b4', 12, 100);
@@ -2581,7 +2980,8 @@ function update(dt){
     // When a wave is cleared, pause and show the reward modal. Player must pick
     // a reward to start the next wave. Ensures one reward per wave via flag.
     // Check both enemies array and spawn queue to see if wave is truly complete
-    if(waveInProgress && enemies.length === 0 && spawnQueue.length === 0){
+    // Also check if boss is alive (boss fight on wave 20)
+    if(waveInProgress && enemies.length === 0 && spawnQueue.length === 0 && !boss){
       waveInProgress = false;
       if(waveRewardShownForWave !== wave){
         waveRewardShownForWave = wave;
@@ -2637,6 +3037,93 @@ function draw(){
   });
   
   enemies.forEach(e => drawEnemy(ctx, e));
+  
+  // Draw boss if active
+  if(boss){
+    // Draw invincibility shield
+    if(boss.isInvincible){
+      ctx.strokeStyle = '#00ffff';
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 100) * 0.4; // Pulsing effect
+      ctx.beginPath();
+      ctx.arc(boss.x, boss.y, boss.radius + 15, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.globalAlpha = 1.0;
+      
+      // Draw shield particles
+      for(let i = 0; i < 12; i++){
+        const angle = (i / 12) * Math.PI * 2 + (Date.now() / 500);
+        const sx = boss.x + Math.cos(angle) * (boss.radius + 15);
+        const sy = boss.y + Math.sin(angle) * (boss.radius + 15);
+        ctx.fillStyle = '#00ffff';
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+      }
+    }
+    
+    // Draw boss body
+    ctx.fillStyle = '#ff4444';
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(boss.x, boss.y, boss.radius, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Draw boss spikes
+    for(let i = 0; i < 8; i++){
+      const angle = (i / 8) * Math.PI * 2;
+      const x1 = boss.x + Math.cos(angle) * boss.radius;
+      const y1 = boss.y + Math.sin(angle) * boss.radius;
+      const x2 = boss.x + Math.cos(angle) * (boss.radius + 20);
+      const y2 = boss.y + Math.sin(angle) * (boss.radius + 20);
+      ctx.strokeStyle = '#ff6666';
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+    
+    // Draw boss health bar above boss
+    const healthBarWidth = 120;
+    const healthBarHeight = 12;
+    const healthBarX = boss.x - healthBarWidth / 2;
+    const healthBarY = boss.y - boss.radius - 30;
+    
+    ctx.fillStyle = '#333333';
+    ctx.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+    
+    const healthPercent = boss.hp / boss.maxHp;
+    const healthColor = healthPercent > 0.5 ? '#00ff00' : (healthPercent > 0.25 ? '#ffff00' : '#ff0000');
+    ctx.fillStyle = healthColor;
+    ctx.fillRect(healthBarX, healthBarY, healthBarWidth * healthPercent, healthBarHeight);
+    
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+    
+    // Draw boss health text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`BOSS HP: ${Math.ceil(boss.hp)}/${boss.maxHp}`, boss.x, healthBarY - 5);
+    
+    // Draw spinning boulders
+    if(boss.spinningBoulders){
+      boss.spinningBoulders.forEach(boulder => {
+        ctx.fillStyle = '#8b4513';
+        ctx.strokeStyle = '#654321';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(boulder.x, boulder.y, boulder.radius, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+      });
+    }
+  }
   
   // Draw enemy projectiles (rocks from red aliens)
   enemyProjectiles.forEach(p => {
@@ -3422,6 +3909,14 @@ function initDebugConsole(){
     updateDebugStats(); 
   });
   
+  // Add Heart spawn button
+  const btnSpawnHeart = document.getElementById('spawnHeart');
+  if(btnSpawnHeart) btnSpawnHeart.addEventListener('click', ()=>{ 
+    hearts.push({ x: W/2, y: H/2, life: 8, radius: 12, healAmount: 2 });
+    debugLog('Spawned Heart at center'); 
+    updateDebugStats(); 
+  });
+  
   // Add Red Alien spawn button
   const btnSpawnRedAlien = document.getElementById('spawnRedAlien');
   if(btnSpawnRedAlien) btnSpawnRedAlien.addEventListener('click', ()=>{ 
@@ -3430,6 +3925,144 @@ function initDebugConsole(){
     enemies.push(redAlien); 
     debugLog('Spawned Red Alien at center'); 
     updateDebugStats(); 
+  });
+  
+  // Add Boss spawn button
+  const btnSpawnBoss = document.getElementById('spawnBoss');
+  if(btnSpawnBoss) btnSpawnBoss.addEventListener('click', ()=>{ 
+    if(boss){
+      debugLog('Boss already active!');
+    } else {
+      boss = new Boss(W/2, H/2 - 100);
+      waveInProgress = true;
+      debugLog('Spawned Boss at center'); 
+      updateDebugStats();
+    }
+  });
+  
+  // Add Wave Skip button
+  const btnSkipWave = document.getElementById('skipWave');
+  if(btnSkipWave) btnSkipWave.addEventListener('click', ()=>{ 
+    enemies.length = 0;
+    spawnQueue.length = 0;
+    boss = null;
+    waveInProgress = false;
+    debugLog('Skipped to next wave'); 
+    updateDebugStats();
+    startNextWave();
+  });
+  
+  // Add Skip to Wave 20 button
+  const btnSkipTo20 = document.getElementById('skipTo20');
+  if(btnSkipTo20) btnSkipTo20.addEventListener('click', ()=>{ 
+    enemies.length = 0;
+    spawnQueue.length = 0;
+    boss = null;
+    wave = 19;
+    waveInProgress = false;
+    debugLog('Skipped to wave 20 (boss wave)'); 
+    updateDebugStats();
+    startNextWave();
+  });
+  
+  // Add Go to Wave button
+  const btnGoToWave = document.getElementById('goToWave');
+  const waveInput = document.getElementById('waveInput');
+  if(btnGoToWave && waveInput) btnGoToWave.addEventListener('click', ()=>{ 
+    const targetWave = parseInt(waveInput.value) || 1;
+    enemies.length = 0;
+    spawnQueue.length = 0;
+    boss = null;
+    wave = Math.max(1, targetWave) - 1;
+    waveInProgress = false;
+    debugLog(`Jumped to wave ${wave + 1}`); 
+    updateDebugStats();
+    startNextWave();
+  });
+  
+  // Player Upgrade Controls
+  const damageValue = document.getElementById('damageValue');
+  const damageInc = document.getElementById('damageInc');
+  const damageDec = document.getElementById('damageDec');
+  if(damageInc && damageValue) damageInc.addEventListener('click', ()=>{
+    player.damage += 1;
+    damageValue.textContent = player.damage.toFixed(1);
+    debugLog(`Damage: ${player.damage}`);
+  });
+  if(damageDec && damageValue) damageDec.addEventListener('click', ()=>{
+    player.damage = Math.max(1, player.damage - 1);
+    damageValue.textContent = player.damage.toFixed(1);
+    debugLog(`Damage: ${player.damage}`);
+  });
+  
+  const fireRateValue = document.getElementById('fireRateValue');
+  const fireRateInc = document.getElementById('fireRateInc');
+  const fireRateDec = document.getElementById('fireRateDec');
+  if(fireRateInc && fireRateValue) fireRateInc.addEventListener('click', ()=>{
+    player.fireRate = Math.max(0.05, player.fireRate - 0.02);
+    fireRateValue.textContent = player.fireRate.toFixed(2);
+    debugLog(`Fire Rate: ${player.fireRate}`);
+  });
+  if(fireRateDec && fireRateValue) fireRateDec.addEventListener('click', ()=>{
+    player.fireRate = Math.min(0.5, player.fireRate + 0.02);
+    fireRateValue.textContent = player.fireRate.toFixed(2);
+    debugLog(`Fire Rate: ${player.fireRate}`);
+  });
+  
+  const maxHPValue = document.getElementById('maxHPValue');
+  const maxHPInc = document.getElementById('maxHPInc');
+  const maxHPDec = document.getElementById('maxHPDec');
+  if(maxHPInc && maxHPValue) maxHPInc.addEventListener('click', ()=>{
+    player.maxHealth += 5;
+    player.health = player.maxHealth;
+    maxHPValue.textContent = player.maxHealth;
+    debugLog(`Max HP: ${player.maxHealth}`);
+  });
+  if(maxHPDec && maxHPValue) maxHPDec.addEventListener('click', ()=>{
+    player.maxHealth = Math.max(10, player.maxHealth - 5);
+    player.health = Math.min(player.health, player.maxHealth);
+    maxHPValue.textContent = player.maxHealth;
+    debugLog(`Max HP: ${player.maxHealth}`);
+  });
+  
+  const speedValue = document.getElementById('speedValue');
+  const speedInc = document.getElementById('speedInc');
+  const speedDec = document.getElementById('speedDec');
+  if(speedInc && speedValue) speedInc.addEventListener('click', ()=>{
+    player.speed += 20;
+    speedValue.textContent = player.speed;
+    debugLog(`Speed: ${player.speed}`);
+  });
+  if(speedDec && speedValue) speedDec.addEventListener('click', ()=>{
+    player.speed = Math.max(100, player.speed - 20);
+    speedValue.textContent = player.speed;
+    debugLog(`Speed: ${player.speed}`);
+  });
+  
+  const healFull = document.getElementById('healFull');
+  if(healFull) healFull.addEventListener('click', ()=>{
+    player.health = player.maxHealth;
+    debugLog('Healed to full HP');
+  });
+  
+  const godMode = document.getElementById('godMode');
+  let godModeActive = false;
+  if(godMode) godMode.addEventListener('click', ()=>{
+    godModeActive = !godModeActive;
+    if(godModeActive){
+      window.originalPlayerHealth = player.health;
+      window.godModeInterval = setInterval(()=>{
+        if(player) player.health = player.maxHealth;
+      }, 100);
+      godMode.textContent = 'GOD MODE ON';
+      godMode.style.background = '#00ff00';
+      debugLog('God Mode: ON');
+    } else {
+      if(window.godModeInterval) clearInterval(window.godModeInterval);
+      godMode.textContent = 'GOD MODE';
+      godMode.style.background = '#ffff00';
+      debugLog('God Mode: OFF');
+    }
   });
   
   if(btnLoadAnim) btnLoadAnim.addEventListener('click', ()=>{
@@ -3533,7 +4166,6 @@ setTimeout(()=>{
   try{
     if(window.loadAnimationScript){
       window.loadAnimationScript('animations/sprite-example.js').then(()=>{
-        console.info('Preloaded animations/sprite-example.js');
         if(typeof refreshAnimDropdown === 'function') refreshAnimDropdown();
       }).catch(()=>{});
     }
@@ -3549,12 +4181,27 @@ window.getLocalPlayerInfo = () => ({
   name: window.discordAuth?.user?.username || 'Player'
 });
 
+// Expose upgrade and gem system to window
+window.totalGems = () => totalGems;
+window.permanentUpgrades = permanentUpgrades;
+window.savePermanentUpgrades = savePermanentUpgrades;
+
+// Function to purchase an upgrade and deduct gems
+window.purchaseUpgradeInGame = function(upgradeKey, cost) {
+  if (totalGems >= cost) {
+    totalGems -= cost;
+    permanentUpgrades[upgradeKey] = (permanentUpgrades[upgradeKey] || 0) + 1;
+    savePermanentUpgrades();
+    return true;
+  }
+  return false;
+};
+
 // Broadcast score updates in co-op mode (call this periodically)
 window.broadcastScore = function() {
   if (window.isCoopMode && window.discordSdk) {
     // This would integrate with your Discord SDK or networking layer
     // For now, it's a placeholder that can be called from main.js
-    console.log('Broadcasting score:', score);
   }
 };
 

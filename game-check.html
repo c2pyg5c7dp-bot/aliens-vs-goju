@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Game Check</title>
+  <style>
+    body { background: #1a1a2e; color: #fff; font-family: monospace; padding: 20px; }
+    .log { background: #000; padding: 10px; margin: 5px 0; border-left: 3px solid #0f0; }
+    .error { border-left-color: #f00; color: #f00; }
+  </style>
+</head>
+<body>
+  <h1>Game Startup Check</h1>
+  <div id="logs"></div>
+  
+  <script>
+    const logsDiv = document.getElementById('logs');
+    
+    function addLog(msg, isError = false) {
+      const div = document.createElement('div');
+      div.className = 'log' + (isError ? ' error' : '');
+      div.textContent = new Date().toLocaleTimeString() + ' - ' + msg;
+      logsDiv.appendChild(div);
+      console.log(msg);
+    }
+    
+    addLog('✓ Page loaded');
+    
+    // Load the game
+    const script = document.createElement('script');
+    script.src = './aliensvsgoju.html';
+    script.onerror = function(e) {
+      addLog('✗ Failed to load aliensvsgoju.html', true);
+      addLog('Error: ' + (e.message || 'Unknown'), true);
+    };
+    document.body.appendChild(script);
+    
+    // Also try fetching it as HTML to embed in iframe
+    addLog('Attempting to fetch game HTML...');
+    fetch('./aliensvsgoju.html')
+      .then(r => {
+        if (r.ok) {
+          addLog('✓ Game HTML fetched successfully');
+          return r.text();
+        } else {
+          addLog('✗ Failed to fetch: ' + r.status, true);
+        }
+      })
+      .then(html => {
+        if (html) {
+          addLog('✓ HTML size: ' + html.length + ' bytes');
+          
+          // Check for key elements
+          if (html.includes('id="game"')) addLog('✓ Canvas found');
+          if (html.includes('id="startBtn"')) addLog('✓ Start button found');
+          if (html.includes('game.main.js')) addLog('✓ game.main.js reference found');
+          
+          // Create iframe with the HTML
+          const iframe = document.createElement('iframe');
+          iframe.style.width = '100%';
+          iframe.style.height = '600px';
+          iframe.style.border = '1px solid #0f0';
+          iframe.style.marginTop = '20px';
+          document.body.appendChild(iframe);
+          
+          iframe.onload = function() {
+            addLog('✓ Game iframe loaded');
+          };
+          
+          iframe.onerror = function(e) {
+            addLog('✗ Game iframe error', true);
+          };
+          
+          // Write HTML to iframe
+          iframe.contentDocument.open();
+          iframe.contentDocument.write(html);
+          iframe.contentDocument.close();
+        }
+      })
+      .catch(err => {
+        addLog('✗ Fetch error: ' + err.message, true);
+      });
+  </script>
+</body>
+</html>

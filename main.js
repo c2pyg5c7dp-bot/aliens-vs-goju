@@ -1,5 +1,4 @@
 // Main entry point with Discord SDK integration
-console.log('🎮 main.js loading...');
 
 // Store Discord SDK globally for game access
 window.discordSdk = null;
@@ -43,25 +42,19 @@ async function setupDiscordSdk() {
 
 // Load game immediately
 function loadGameNow() {
-  console.log('🎮 loadGameNow() called');
   const loadingScreen = document.getElementById('loading-screen');
   
   if (loadingScreen) {
-    console.log('🎬 Hiding loading screen...');
     loadingScreen.style.display = 'none';
-    console.log('✅ Loading screen hidden');
   }
 }
 
 async function init() {
-  console.log('🚀 Init function started');
-  
   // FAILSAFE: Always remove loading screen after 3 seconds max
   setTimeout(() => {
     const ls = document.getElementById('loading-screen');
     if (ls) {
       ls.style.display = 'none';
-      console.log('✅ Failsafe: Loading screen hidden');
     }
   }, 3000);
   

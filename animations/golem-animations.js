@@ -1,9 +1,8 @@
 // Golem enemy animation loader for directional sprites
 // Supports 8-directional walking animation
 
-(function(){
+(function() {
   'use strict';
-  console.log('📦 Loading golem-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -29,7 +28,7 @@
 
   // Golem animation state manager
   class GolemAnimationController {
-    constructor(basePath = '/animations/golem'){
+    constructor(basePath = './animations/golem'){
       this.basePath = basePath;
       this.sprites = {}; // animType_direction -> { frames: [Image], frameW, frameH, loaded }
       this.enabled = false; // disabled until sprites load
@@ -43,6 +42,9 @@
       const frames = [];
       let loadedFrames = 0;
       
+      // Create sprite entry FIRST so callbacks can access it
+      this.sprites[key] = { frames, frameW, frameH, loaded: false };
+      
       this.totalToLoad += frameCount;
       
       for(let i = 0; i < frameCount; i++){
@@ -54,7 +56,7 @@
           loadedFrames++;
           this.loadedCount++;
           if(loadedFrames === frameCount){
-            this.sprites[key] = { frames, frameW, frameH, loaded: true };
+            this.sprites[key].loaded = true;
             console.log(`Golem animation loaded: ${key} (${frameCount} frames)`);
             if(this.loadedCount === this.totalToLoad){
               this.enabled = true;
@@ -72,6 +74,9 @@
         img.src = path;
         frames.push(img);
       }
+      
+      // Update frames array
+      this.sprites[key].frames = frames;
     }
 
     // Create animation instance for a Golem enemy
@@ -144,6 +149,4 @@
 
   // Expose to global scope
   window.golemAnimController = golemAnimController;
-  golemAnimController.loadAll();
-  console.log('Golem animation controller initialized and loading...');
 })();

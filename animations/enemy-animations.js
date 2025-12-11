@@ -1,9 +1,8 @@
 // Enemy animation loader for directional sprites
 // Supports 8-directional scary-walk animation
 
-(function(){
+(function() {
   'use strict';
-  console.log('📦 Loading enemy-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -29,7 +28,7 @@
 
   // Enemy animation state manager
   class EnemyAnimationController {
-    constructor(basePath = '/animations/enemies'){
+    constructor(basePath = './animations/enemies'){
       this.basePath = basePath;
       this.sprites = {}; // animType_direction -> { frames: [Image], frameW, frameH, loaded }
       this.enabled = false; // disabled until sprites load
@@ -42,6 +41,9 @@
       const key = `${animType}_${direction}`;
       const frames = [];
       let loadedFrames = 0;
+      
+      // Create sprite entry FIRST so callbacks can access it
+      this.sprites[key] = { frames, frameW, frameH, loaded: false };
       
       this.totalToLoad += frameCount;
       
@@ -72,7 +74,8 @@
         frames.push(img);
       }
       
-      this.sprites[key] = { frames, frameW, frameH, loaded: false };
+      // Update frames array
+      this.sprites[key].frames = frames;
     }
 
     // Preload all enemy animations

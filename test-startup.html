@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Game Startup Test</title>
+</head>
+<body style="background: #1a1a2e; color: #fff; font-family: Arial; padding: 20px;">
+  <h1>Game Startup Diagnostic</h1>
+  <div id="output" style="background: #000; padding: 10px; border-radius: 5px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px;"></div>
+  
+  <script>
+    const output = document.getElementById('output');
+    function log(msg) {
+      const div = document.createElement('div');
+      div.textContent = new Date().toLocaleTimeString() + ' - ' + msg;
+      output.appendChild(div);
+      console.log(msg);
+    }
+    
+    log('📌 Starting diagnostic...');
+    log('📍 Location: ' + window.location.href);
+    
+    // Check if canvas exists in this page
+    const canvas = document.getElementById('game');
+    log('Canvas in this page: ' + (canvas ? 'FOUND' : 'NOT FOUND'));
+    
+    // Try to load the main HTML
+    log('📦 Fetching main game HTML...');
+    fetch('./aliensvsgoju.html')
+      .then(r => {
+        log('✅ HTML fetched, status: ' + r.status);
+        return r.text();
+      })
+      .then(html => {
+        log('📊 HTML size: ' + html.length + ' bytes');
+        
+        // Check for key elements
+        if (html.includes('id="game"')) log('✅ Canvas element found in HTML');
+        if (html.includes('id="startBtn"')) log('✅ Start button found in HTML');
+        if (html.includes('game.main.js')) log('✅ game.main.js reference found');
+        if (html.includes('loadPermanentUpgrades')) log('✅ Upgrades code found');
+        
+        // Check for obvious syntax errors
+        const scriptTags = html.match(/<script[^>]*>/g) || [];
+        log('📜 Script tags found: ' + scriptTags.length);
+        scriptTags.forEach((tag, i) => {
+          log('  ' + i + ': ' + tag.substring(0, 80));
+        });
+      })
+      .catch(err => {
+        log('❌ Failed to fetch: ' + err.message);
+      });
+    
+    // Check if animations are accessible
+    log('🎬 Checking animation assets...');
+    ['./animations/Player/rotations/south.png', './animations/golem/rotations/south.png']
+      .forEach(url => {
+        fetch(url, { method: 'HEAD' })
+          .then(r => log('  ' + (r.ok ? '✅' : '❌') + ' ' + url))
+          .catch(() => log('  ❌ ' + url + ' (fetch error)'));
+      });
+  </script>
+</body>
+</html>

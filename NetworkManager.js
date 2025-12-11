@@ -3,8 +3,6 @@
  * Handles room creation, joining, and all network communication for co-op gameplay
  */
 
-console.log('🌐 NetworkManager.js loading...');
-
 class NetworkManager {
   constructor() {
     // Core networking

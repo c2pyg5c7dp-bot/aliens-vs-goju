@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Minimal Game Test</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { margin: 0; padding: 0; background: #1a1a2e; overflow: hidden; }
+    #canvas { display: block; width: 100vw; height: 100vh; }
+    #ui { position: absolute; top: 10px; right: 10px; color: #fff; font-family: monospace; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 5px; max-width: 300px; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="ui">
+    <div>Click Start to test game</div>
+    <button onclick="startGame()" style="padding: 10px 20px; margin-top: 10px; font-size: 14px;">START GAME</button>
+    <div id="status" style="margin-top: 10px; font-size: 12px; color: #0f0;"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status');
+    
+    function log(msg) {
+      status.textContent += msg + '\n';
+      console.log(msg);
+    }
+    
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    let gameRunning = false;
+    
+    function draw() {
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.fillStyle = '#0f0';
+      ctx.font = '24px Arial';
+      ctx.fillText('Game is Running!', canvas.width / 2 - 100, canvas.height / 2);
+    }
+    
+    function loop() {
+      if (gameRunning) {
+        draw();
+        requestAnimationFrame(loop);
+      }
+    }
+    
+    function startGame() {
+      gameRunning = true;
+      log('✓ Game started');
+      loop();
+    }
+    
+    log('✓ Minimal test loaded');
+  </script>
+</body>
+</html>

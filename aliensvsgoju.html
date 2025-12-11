@@ -280,14 +280,53 @@
     </div>
   </div>
 
+  <!-- Stage Select Screen -->
+  <div id="stageSelectScreen" class="overlay" style="display:none">
+    <div class="stage-select-container">
+      <div class="stage-select-header">
+        <h1 style="font-size: 48px; margin: 0; color: #0f0; text-shadow: 0 0 20px rgba(0,255,0,0.8);">SELECT STAGE</h1>
+      </div>
+      
+      <div class="stage-select-grid">
+        <!-- Stage 1 -->
+        <div class="stage-select-card unlocked" data-stage="1">
+          <div class="stage-num">1</div>
+          <div class="stage-title">HOME GROUND</div>
+          <div class="stage-status">✓ Available</div>
+          <button class="stage-play-btn">PLAY</button>
+        </div>
+        
+        <!-- Stage 2 -->
+        <div class="stage-select-card locked" data-stage="2">
+          <div class="stage-num">2</div>
+          <div class="stage-title">COMING SOON</div>
+          <div class="stage-status">🔒 Locked</div>
+          <div class="stage-requirement">Reach Wave 20 on Stage 1</div>
+          <div class="stage-progress"><span id="stage2-progress">0</span>/20</div>
+        </div>
+        
+        <!-- Stage 3 -->
+        <div class="stage-select-card locked" data-stage="3">
+          <div class="stage-num">3</div>
+          <div class="stage-title">COMING SOON</div>
+          <div class="stage-status">🔒 Locked</div>
+          <div class="stage-requirement">Reach Wave 20 on Stage 2</div>
+          <div class="stage-progress"><span id="stage3-progress">0</span>/20</div>
+        </div>
+      </div>
+      
+      <button id="backToCharSelect" class="back-btn">← BACK</button>
+    </div>
+  </div>
+
   <div id="ui">
     <div id="hud">
-      <div class="hud-stat" style="display:none">
+      <div class="hud-stat">
         <span class="hud-icon">💎</span>
         <span class="hud-label">Score</span>
         <span id="score" class="hud-value">0</span>
       </div>
-      <div class="hud-stat" style="display:none">
+      <div class="hud-stat">
         <span class="hud-icon">❤️</span>
         <span class="hud-label">Health</span>
         <div class="health-bar-container">
@@ -558,6 +597,15 @@
       <button id="dbgSimFire" style="flex:1; padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Sim Fire</button>
       <button id="dbgStart" style="flex:1; padding:4px; background:#0f0; color:#000; border:none; cursor:pointer">Start</button>
     </div>
+    <div style="display:flex; gap:6px; margin-top:6px">
+      <button id="skipWave" style="flex:1; padding:4px; background:#ffa500; color:#000; border:none; cursor:pointer; font-weight:bold">Skip Wave</button>
+      <button id="skipTo20" style="flex:1; padding:4px; background:#ff4444; color:#fff; border:none; cursor:pointer; font-weight:bold">Skip to Wave 20</button>
+    </div>
+    <div style="display:flex; gap:6px; margin-top:6px; align-items:center">
+      <label style="flex:1; font-size:11px">Go to Wave:</label>
+      <input id="waveInput" type="number" min="1" max="100" value="1" style="flex:1; padding:4px; background:#111; color:#0f0; border:1px solid #0f0; text-align:center"/>
+      <button id="goToWave" style="flex:1; padding:4px; background:#00ffff; color:#000; border:none; cursor:pointer; font-weight:bold">GO</button>
+    </div>
     <div style="margin-top:8px; padding:8px; background:#111; border:1px solid #0f0; border-radius:4px">
       <div style="font-weight:bold; margin-bottom:4px; color:#ff0">Spawn Powerups</div>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px">
@@ -570,7 +618,38 @@
         <button id="spawnX2Score" style="padding:4px; background:#ffa500; color:#000; border:none; cursor:pointer; font-size:10px; font-weight:bold">X2 SCORE</button>
         <button id="spawnNuke" style="padding:4px; background:#ffff00; color:#000; border:none; cursor:pointer; font-size:10px; font-weight:bold">NUKE</button>
         <button id="spawnGem" style="padding:4px; background:#fff28f; color:#000; border:none; cursor:pointer; font-size:10px">Gem</button>
+        <button id="spawnHeart" style="padding:4px; background:#ff69b4; color:#000; border:none; cursor:pointer; font-size:10px">Heart</button>
         <button id="spawnRedAlien" style="padding:4px; background:#ff3333; color:#fff; border:none; cursor:pointer; font-size:10px; font-weight:bold">RED ALIEN</button>
+        <button id="spawnBoss" style="padding:4px; background:#ff0000; color:#fff; border:none; cursor:pointer; font-size:10px; font-weight:bold">BOSS</button>
+      </div>
+    </div>
+    <div style="margin-top:8px; padding:8px; background:#111; border:1px solid #0f0; border-radius:4px">
+      <div style="font-weight:bold; margin-bottom:4px; color:#ff0">⚡ Player Upgrades</div>
+      <div style="display:grid; gap:4px">
+        <div style="display:flex; align-items:center; gap:6px">
+          <label style="flex:1; font-size:10px">Damage: <span id="damageValue">5</span></label>
+          <button id="damageDec" style="padding:2px 6px; background:#f00; color:#000; border:none; cursor:pointer">-</button>
+          <button id="damageInc" style="padding:2px 6px; background:#0f0; color:#000; border:none; cursor:pointer">+</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px">
+          <label style="flex:1; font-size:10px">Fire Rate: <span id="fireRateValue">0.16</span></label>
+          <button id="fireRateDec" style="padding:2px 6px; background:#f00; color:#000; border:none; cursor:pointer">-</button>
+          <button id="fireRateInc" style="padding:2px 6px; background:#0f0; color:#000; border:none; cursor:pointer">+</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px">
+          <label style="flex:1; font-size:10px">Max HP: <span id="maxHPValue">20</span></label>
+          <button id="maxHPDec" style="padding:2px 6px; background:#f00; color:#000; border:none; cursor:pointer">-</button>
+          <button id="maxHPInc" style="padding:2px 6px; background:#0f0; color:#000; border:none; cursor:pointer">+</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px">
+          <label style="flex:1; font-size:10px">Speed: <span id="speedValue">220</span></label>
+          <button id="speedDec" style="padding:2px 6px; background:#f00; color:#000; border:none; cursor:pointer">-</button>
+          <button id="speedInc" style="padding:2px 6px; background:#0f0; color:#000; border:none; cursor:pointer">+</button>
+        </div>
+        <div style="display:flex; gap:4px; margin-top:4px">
+          <button id="healFull" style="flex:1; padding:4px; background:#ff69b4; color:#000; border:none; cursor:pointer; font-size:10px; font-weight:bold">HEAL FULL</button>
+          <button id="godMode" style="flex:1; padding:4px; background:#ffff00; color:#000; border:none; cursor:pointer; font-size:10px; font-weight:bold">GOD MODE</button>
+        </div>
       </div>
     </div>
     <div style="margin-top:8px; padding:8px; background:#111; border:1px solid #0f0; border-radius:4px">
@@ -590,21 +669,17 @@
   <!-- Lobby functionality loaded as external script for Discord compatibility -->
   <script defer src="./lobby.js?v=7"></script>
 
-  <!-- Permanent upgrades UI -->
-  <script defer src="./upgrades.js?v=1"></script>
-
   <!-- Global error handler -->
   <script src="./error-handler.js?v=5"></script>
 
-  <!-- Test file to verify public directory serving -->
-  <script src="./test-load.js?v=4"></script>
-  
   <!-- Discord SDK and main initialization -->
   <script type="module" src="./main.js?v=5"></script>
   
   <!-- Game scripts loaded with defer to ensure DOM is ready -->
-  <script defer src="./game.main.js?v=20241208-final"></script>
+  <script defer src="./game.main.js?v=20241209-stage-redesign"></script>
   <script defer src="./animations/player-animations.js?v=5"></script>
+  <script defer src="./animations/speedster-animations.js?v=2"></script>
+  <script defer src="./animations/glass-cannon-animations.js?v=2"></script>
   <script defer src="./animations/enemy-animations.js?v=5"></script>
   <script defer src="./animations/golem-animations.js?v=5"></script>
   <script defer src="./animations/redalien-animations.js?v=5"></script>

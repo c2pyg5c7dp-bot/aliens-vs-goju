@@ -3,8 +3,6 @@
  * Handles room creation, joining, character selection, and game start
  */
 
-console.log('🎮 lobby.js loading...');
-
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================

@@ -1,5 +1,4 @@
 // Permanent Upgrades UI
-console.log('💎 upgrades.js loading...');
 
 // Upgrade costs and max levels
 const UPGRADE_COSTS = {
@@ -48,18 +47,20 @@ function renderUpgrades() {
   
   if (!upgradesList) return;
   
-  // Update gem displays
-  if (totalGemsDisplay) totalGemsDisplay.textContent = window.totalGems || 0;
-  if (totalGemsUpgrade) totalGemsUpgrade.textContent = window.totalGems || 0;
+  // Update gem displays - get the actual value
+  const gemsTotal = typeof window.totalGems === 'function' ? window.totalGems() : window.totalGems || 0;
+  if (totalGemsDisplay) totalGemsDisplay.textContent = gemsTotal;
+  if (totalGemsUpgrade) totalGemsUpgrade.textContent = gemsTotal;
   
   upgradesList.innerHTML = '';
   
   Object.keys(UPGRADE_COSTS).forEach(upgradeKey => {
-    const currentLevel = window.permanentUpgrades[upgradeKey] || 0;
+    const permanentUpgrades = window.permanentUpgrades || {};
+    const currentLevel = permanentUpgrades[upgradeKey] || 0;
     const maxLevel = UPGRADE_COSTS[upgradeKey].length;
     const isMaxed = currentLevel >= maxLevel;
     const cost = isMaxed ? 0 : UPGRADE_COSTS[upgradeKey][currentLevel];
-    const canAfford = window.totalGems >= cost;
+    const canAfford = gemsTotal >= cost;
     
     const upgradeCard = document.createElement('div');
     upgradeCard.style.cssText = `
@@ -119,7 +120,8 @@ function renderUpgrades() {
 }
 
 function purchaseUpgrade(upgradeKey) {
-  const currentLevel = window.permanentUpgrades[upgradeKey] || 0;
+  const permanentUpgrades = window.permanentUpgrades || {};
+  const currentLevel = permanentUpgrades[upgradeKey] || 0;
   const maxLevel = UPGRADE_COSTS[upgradeKey].length;
   
   if (currentLevel >= maxLevel) {
@@ -129,24 +131,17 @@ function purchaseUpgrade(upgradeKey) {
   
   const cost = UPGRADE_COSTS[upgradeKey][currentLevel];
   
-  if (window.totalGems < cost) {
-    console.log('Not enough gems');
-    return;
-  }
-  
-  // Purchase upgrade
-  window.totalGems -= cost;
-  window.permanentUpgrades[upgradeKey]++;
-  
-  // Save to localStorage
-  if (window.savePermanentUpgrades) {
-    window.savePermanentUpgrades();
-  }
-  
-  // Play success sound
-  if (window.beep) {
-    window.beep(800, 0.08, 'sine', 0.003);
-    window.beep(1200, 0.12, 'sine', 0.003);
+  // Use the game's purchase function to deduct gems and update upgrades
+  if (window.purchaseUpgradeInGame && window.purchaseUpgradeInGame(upgradeKey, cost)) {
+    console.log('Upgrade purchased:', upgradeKey);
+    
+    // Play success sound
+    if (window.beep) {
+      window.beep(800, 0.08, 'sine', 0.003);
+      window.beep(1200, 0.12, 'sine', 0.003);
+    }
+  } else {
+    console.log('Not enough gems to purchase');
   }
   
   // Re-render upgrades
@@ -176,13 +171,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (startScreen) startScreen.style.display = 'flex';
       // Update gem count on main menu
       const totalGemsDisplay = document.getElementById('totalGemsDisplay');
-      if (totalGemsDisplay) totalGemsDisplay.textContent = window.totalGems || 0;
+      const gemsTotal = typeof window.totalGems === 'function' ? window.totalGems() : window.totalGems || 0;
+      if (totalGemsDisplay) totalGemsDisplay.textContent = gemsTotal;
     });
   }
   
   // Initial render of gem count
   const totalGemsDisplay = document.getElementById('totalGemsDisplay');
-  if (totalGemsDisplay) totalGemsDisplay.textContent = window.totalGems || 0;
+  const gemsTotal = typeof window.totalGems === 'function' ? window.totalGems() : window.totalGems || 0;
+  if (totalGemsDisplay) totalGemsDisplay.textContent = gemsTotal;
 });
 
 console.log('✅ upgrades.js loaded');

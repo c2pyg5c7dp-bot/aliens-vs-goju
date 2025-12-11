@@ -1,9 +1,8 @@
 // Player animation loader for directional sprites
 // Supports 8-directional running and fireball animations
 
-(function(){
+(function() {
   'use strict';
-  console.log('📦 Loading player-animations.js...');
   
   // Safety check - don't load if critical dependencies missing
   if(typeof window === 'undefined') return;
@@ -29,7 +28,7 @@
 
   // Player animation state manager
   class PlayerAnimationController {
-    constructor(basePath = '/animations/Player'){
+    constructor(basePath = './animations/Player'){
       this.basePath = basePath;
       this.sprites = {}; // spriteKey -> { frames: [Image], frameW, frameH, loaded }
       this.currentAnim = null;
@@ -48,6 +47,9 @@
       const key = `${animType}_${direction}`;
       const frames = [];
       let loadedFrames = 0;
+      
+      // Create sprite entry FIRST so callbacks can access it
+      this.sprites[key] = { frames, frameW, frameH, loaded: false };
       
       this.totalToLoad += frameCount;
       
@@ -78,7 +80,8 @@
         frames.push(img);
       }
       
-      this.sprites[key] = { frames, frameW, frameH, loaded: false };
+      // Update frames array
+      this.sprites[key].frames = frames;
     }
 
     // Preload all player animations
