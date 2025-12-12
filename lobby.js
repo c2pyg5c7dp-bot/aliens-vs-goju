@@ -33,7 +33,9 @@ const lobbyState = {
   myCharacter: null,
   isHost: false,
   shareableCode: null,
-  hostPeerId: null
+  hostPeerId: null,
+  isReady: false,
+  readyPlayers: new Set()
 };
 
 // ============================================================================
@@ -116,6 +118,10 @@ function createLocalPlayerCard() {
     ? '<div style="background: #4CAF50; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">HOST</div>'
     : '<div style="background: #2196F3; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">JOINED</div>';
   
+  const readyBadge = lobbyState.isReady
+    ? '<div style="background: #00ff00; color: #000; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">✓ READY</div>'
+    : '<div style="background: #ff9800; color: #000; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">⚠ NOT READY</div>';
+  
   return `
     <div style="padding: 10px; background: rgba(76, 175, 80, 0.2); border-radius: 8px; border: 2px solid #4CAF50;">
       <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -126,7 +132,10 @@ function createLocalPlayerCard() {
             <div style="font-size: 12px; opacity: 0.7;">${lobbyState.myCharacter ? getCharacterName(lobbyState.myCharacter) : 'No character selected'}</div>
           </div>
         </div>
-        ${hostBadge}
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          ${hostBadge}
+          ${readyBadge}
+        </div>
       </div>
     </div>
   `;
@@ -136,6 +145,11 @@ function createLocalPlayerCard() {
  * Create remote player card HTML
  */
 function createRemotePlayerCard(player) {
+  const isPlayerReady = lobbyState.readyPlayers.has(player.id);
+  const readyBadge = isPlayerReady
+    ? '<div style="background: #00ff00; color: #000; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">✓ READY</div>'
+    : '<div style="background: #ff9800; color: #000; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">⚠ NOT READY</div>';
+  
   const playerBadge = '<div style="background: #666; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">PLAYER</div>';
   
   return `
@@ -148,7 +162,10 @@ function createRemotePlayerCard(player) {
             <div style="font-size: 12px; opacity: 0.7;">${player.character ? getCharacterName(player.character) : 'Selecting...'}</div>
           </div>
         </div>
-        ${playerBadge}
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          ${playerBadge}
+          ${readyBadge}
+        </div>
       </div>
     </div>
   `;
@@ -175,6 +192,53 @@ function updateLobbyStatus() {
     lobbyStatus.textContent = lobbyState.myCharacter 
       ? `Ready! Code: ${lobbyState.code}` 
       : 'Select your character to continue';
+  }
+  
+  // Update start button state
+  updateStartButtonState();
+}
+
+/**
+ * Update start button enabled/disabled state
+ */
+function updateStartButtonState() {
+  const startCoopBtn = document.getElementById('startCoopBtn');
+  if (!startCoopBtn) return;
+  
+  // Check player count
+  const playerCount = window.networkManager ? window.networkManager.getPlayers().length + 1 : 1;
+  const hasCharacter = !!lobbyState.myCharacter;
+  const allPlayers = window.networkManager ? window.networkManager.getPlayers() : [];
+  const readyCount = lobbyState.readyPlayers.size + (lobbyState.isReady ? 1 : 0);
+  
+  if (playerCount < 2) {
+    startCoopBtn.disabled = true;
+    startCoopBtn.textContent = `⏳ Waiting for Players (${playerCount}/2+)`;
+    startCoopBtn.style.opacity = '0.5';
+    startCoopBtn.style.cursor = 'not-allowed';
+    startCoopBtn.style.background = '#666';
+  } else if (!hasCharacter) {
+    startCoopBtn.disabled = true;
+    startCoopBtn.textContent = '⚠️ Select Character First';
+    startCoopBtn.style.opacity = '0.5';
+    startCoopBtn.style.cursor = 'not-allowed';
+    startCoopBtn.style.background = '#666';
+  } else if (lobbyState.isReady) {
+    // Already ready - show unready option
+    startCoopBtn.disabled = false;
+    startCoopBtn.textContent = `✅ READY (${readyCount}/${playerCount}) - Click to Unready`;
+    startCoopBtn.style.opacity = '1';
+    startCoopBtn.style.cursor = 'pointer';
+    startCoopBtn.style.background = '#00ff00';
+    startCoopBtn.style.color = '#000';
+  } else {
+    // Not ready - show ready up button
+    startCoopBtn.disabled = false;
+    startCoopBtn.textContent = `⚡ Ready Up (${readyCount}/${playerCount} ready)`;
+    startCoopBtn.style.opacity = '1';
+    startCoopBtn.style.cursor = 'pointer';
+    startCoopBtn.style.background = '#4CAF50';
+    startCoopBtn.style.color = '#fff';
   }
 }
 
@@ -209,7 +273,22 @@ function setupNetworkCallbacks() {
   window.networkManager.onPlayerLeft = (playerId) => {
     console.log('👋 Player left:', playerId);
     logToLobbyDebug(`❌ Player left: ${playerId}`);
+    lobbyState.readyPlayers.delete(playerId);
     updateLobbyDisplay();
+  };
+
+  window.networkManager.onPlayerReady = (playerId, isReady) => {
+    console.log('✅ Player ready state:', playerId, isReady);
+    logToLobbyDebug(`${isReady ? '✅' : '❌'} Player ${playerId.slice(-4)} ${isReady ? 'ready' : 'not ready'}`);
+    
+    if (isReady) {
+      lobbyState.readyPlayers.add(playerId);
+    } else {
+      lobbyState.readyPlayers.delete(playerId);
+    }
+    
+    updateLobbyDisplay();
+    checkAllPlayersReady();
   };
   
   window.networkManager.onStartGame = (players) => {
@@ -226,6 +305,68 @@ function setupNetworkCallbacks() {
 // ============================================================================
 // VALIDATION FUNCTIONS
 // ============================================================================
+
+/**
+ * Check if all players are ready and start game if so
+ */
+function checkAllPlayersReady() {
+  if (!window.networkManager) return;
+  
+  const allPlayers = window.networkManager.getPlayers();
+  const totalPlayers = allPlayers.length + 1; // +1 for local player
+  
+  // Need at least 2 players
+  if (totalPlayers < 2) return;
+  
+  // Check if local player is ready
+  if (!lobbyState.isReady || !lobbyState.myCharacter) return;
+  
+  // Check if all remote players are ready
+  const allRemoteReady = allPlayers.every(p => lobbyState.readyPlayers.has(p.id));
+  
+  if (allRemoteReady) {
+    console.log('🎮 All players ready! Starting game...');
+    logToLobbyDebug(`🎮 All ${totalPlayers} players ready! Starting...`);
+    
+    setTimeout(() => {
+      startCoopGame();
+    }, 1000); // Small delay for UI feedback
+  }
+}
+
+/**
+ * Start the co-op game
+ */
+function startCoopGame() {
+  console.log('🎮 Starting game with:', lobbyState.myCharacter);
+  window.isCoopMode = true;
+  
+  // Host broadcasts game start to all players
+  if (lobbyState.isHost && window.networkManager) {
+    console.log('📤 Broadcasting game start...');
+    logToLobbyDebug('📤 Broadcasting start...');
+    window.networkManager.startGame();
+  }
+  
+  // Hide lobby screen
+  const lobbyScreen = document.getElementById('lobbyScreen');
+  if (lobbyScreen) lobbyScreen.style.display = 'none';
+  
+  // Start the game
+  if (typeof window.startGameWithCharacter === 'function') {
+    window.startGameWithCharacter(lobbyState.myCharacter);
+  } else {
+    console.log('⏳ Waiting for game to load...');
+    setTimeout(() => {
+      if (typeof window.startGameWithCharacter === 'function') {
+        window.startGameWithCharacter(lobbyState.myCharacter);
+      } else {
+        console.error('❌ startGameWithCharacter function not available!');
+        alert('⚠️ Game failed to load. Please refresh the page.');
+      }
+    }, 500);
+  }
+}
 
 /**
  * Validate and ensure required libraries are loaded
@@ -427,6 +568,27 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('load', () => {
   logToLobbyDebug('Window loaded ✅');
   logToLobbyDebug('game.main.js: ' + (typeof window.startGameWithCharacter !== 'undefined' ? '✅' : '❌ NOT LOADED'));
+  
+  // Auto-initialize PeerJS connection on page load
+  setTimeout(async () => {
+    if (window.networkManager && typeof Peer !== 'undefined') {
+      if (!window.networkManager.peer) {
+        try {
+          console.log('🔌 Auto-initializing PeerJS...');
+          logToLobbyDebug('🔌 Auto-init PeerJS...');
+          await window.networkManager.init();
+          console.log('✅ PeerJS auto-initialized successfully!');
+          logToLobbyDebug('✅ PeerJS ready!');
+        } catch (error) {
+          console.error('❌ PeerJS auto-init failed:', error);
+          logToLobbyDebug('❌ Auto-init failed: ' + error.message);
+        }
+      }
+    } else {
+      console.warn('⚠️ NetworkManager or PeerJS not available for auto-init');
+      logToLobbyDebug('⚠️ Missing: NM=' + !!window.networkManager + ' Peer=' + (typeof Peer !== 'undefined'));
+    }
+  }, 2000); // Wait 2 seconds for everything to load
 });
 
 /**
@@ -446,63 +608,70 @@ function setupCoopButton() {
  * Setup join lobby button and modal
  */
 function setupJoinLobbyButton() {
-  const joinLobbyBtn = document.getElementById('joinLobbyBtn');
   const joinLobbyModal = document.getElementById('joinLobbyModal');
   const joinLobbyConfirm = document.getElementById('joinLobbyConfirm');
   const joinLobbyCancel = document.getElementById('joinLobbyCancel');
   const lobbyCodeInput = document.getElementById('lobbyCodeInput');
   const joinError = document.getElementById('joinError');
   
-  if (!joinLobbyBtn || !joinLobbyModal) {
-    logToLobbyDebug('❌ Join Lobby elements NOT found!');
+  if (!joinLobbyModal) {
+    console.warn('❌ Join Lobby modal NOT found!');
+    logToLobbyDebug('❌ Join Lobby modal NOT found!');
     return;
   }
   
-  logToLobbyDebug('Join Lobby button found ✅');
-  
-  // Show modal
-  joinLobbyBtn.addEventListener('click', () => {
-    console.log('Join Lobby clicked!');
-    logToLobbyDebug('Join Lobby clicked! 🔗');
-    joinLobbyModal.style.display = 'flex';
-    lobbyCodeInput.value = '';
-    joinError.textContent = '';
-    lobbyCodeInput.focus();
-  });
+  console.log('✅ Join Lobby modal found, setting up handlers');
+  logToLobbyDebug('Join Lobby modal found ✅');
   
   // Cancel button
-  joinLobbyCancel.addEventListener('click', () => {
-    joinLobbyModal.style.display = 'none';
-    lobbyCodeInput.value = '';
-    joinError.textContent = '';
-  });
+  if (joinLobbyCancel) {
+    joinLobbyCancel.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🔚 Cancel button clicked');
+      logToLobbyDebug('Cancel clicked 🔚');
+      joinLobbyModal.style.display = 'none';
+      if (lobbyCodeInput) lobbyCodeInput.value = '';
+      if (joinError) joinError.textContent = '';
+    });
+    console.log('✅ Cancel button handler attached');
+  } else {
+    console.warn('❌ Cancel button not found');
+  }
   
   // Confirm button
-  joinLobbyConfirm.addEventListener('click', async () => {
-    joinError.textContent = '🔄 Connecting...';
-    joinError.style.color = '#2196F3';
-    
-    const result = await joinLobby(lobbyCodeInput.value);
-    
-    if (result.success) {
-      joinLobbyModal.style.display = 'none';
-    } else {
-      joinError.textContent = result.error;
-      joinError.style.color = '#f44336';
-    }
-  });
+  if (joinLobbyConfirm) {
+    joinLobbyConfirm.addEventListener('click', async () => {
+      joinError.textContent = '🔄 Connecting...';
+      joinError.style.color = '#2196F3';
+      
+      const result = await joinLobby(lobbyCodeInput.value);
+      
+      if (result.success) {
+        joinLobbyModal.style.display = 'none';
+      } else {
+        joinError.textContent = result.error;
+        joinError.style.color = '#f44336';
+      }
+    });
+    console.log('✅ Confirm button handler attached');
+  } else {
+    console.warn('❌ Confirm button not found');
+  }
   
-  // Auto-uppercase input
-  lobbyCodeInput.addEventListener('input', (e) => {
-    e.target.value = e.target.value.toUpperCase();
-  });
-  
-  // Enter key to submit
-  lobbyCodeInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      joinLobbyConfirm.click();
-    }
-  });
+  // Trim whitespace from input
+  if (lobbyCodeInput) {
+    lobbyCodeInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.trim();
+    });
+    
+    // Enter key to submit
+    lobbyCodeInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && joinLobbyConfirm) {
+        joinLobbyConfirm.click();
+      }
+    });
+  }
 }
 
 /**
@@ -511,6 +680,7 @@ function setupJoinLobbyButton() {
 function setupLobbyControls() {
   setupCopyButton();
   setupShareButton();
+  setupJoinGameButton();
 }
 
 /**
@@ -580,6 +750,50 @@ function setupShareButton() {
 }
 
 /**
+ * Setup join game button in lobby screen
+ */
+function setupJoinGameButton() {
+  const joinGameBtn = document.getElementById('joinGameBtn');
+  if (!joinGameBtn) {
+    console.warn('❌ Join Game button NOT found in DOM');
+    logToLobbyDebug('❌ Join Game button NOT found!');
+    return;
+  }
+  
+  console.log('✅ Join Game button found, setting up click handler');
+  logToLobbyDebug('Join Game button found ✅');
+  
+  joinGameBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('🎮 Join Game button clicked!');
+    logToLobbyDebug('Join Game clicked! 🎮');
+    
+    // Show the join lobby modal
+    const joinLobbyModal = document.getElementById('joinLobbyModal');
+    const lobbyCodeInput = document.getElementById('lobbyCodeInput');
+    
+    if (!joinLobbyModal) {
+      console.error('❌ joinLobbyModal not found');
+      logToLobbyDebug('❌ Join modal NOT found!');
+      return;
+    }
+    
+    console.log('📂 Opening join lobby modal...');
+    logToLobbyDebug('Opening join modal 📂');
+    
+    joinLobbyModal.style.display = 'flex';
+    joinLobbyModal.style.visibility = 'visible';
+    
+    if (lobbyCodeInput) {
+      lobbyCodeInput.value = '';
+      lobbyCodeInput.focus();
+    }
+  });
+}
+
+/**
  * Setup character selection in lobby
  */
 function setupCharacterSelection() {
@@ -613,16 +827,18 @@ function setupGameControls() {
 }
 
 /**
- * Setup start game button
+ * Setup start game button (now ready up button)
  */
 function setupStartButton() {
   const startCoopBtn = document.getElementById('startCoopBtn');
   if (!startCoopBtn) return;
   
   startCoopBtn.addEventListener('click', () => {
+    // Check character selection
     if (!lobbyState.myCharacter) {
-      console.warn('Please select a character first!');
-      window.debugLog?.('⚠️ Please select a character first!');
+      console.warn('⚠️ Please select a character first!');
+      logToLobbyDebug('⚠️ Select character first!');
+      alert('⚠️ Please select a character before readying up!');
       
       const charSection = document.querySelector('.lobby-char-card')?.parentElement?.parentElement;
       if (charSection) {
@@ -631,27 +847,23 @@ function setupStartButton() {
       }
       return;
     }
+
+    // Toggle ready state
+    lobbyState.isReady = !lobbyState.isReady;
     
-    console.log('Starting game with:', lobbyState.myCharacter);
-    window.isCoopMode = true;
+    console.log('🎮 Ready state changed:', lobbyState.isReady);
+    logToLobbyDebug(`${lobbyState.isReady ? '✅' : '❌'} You are ${lobbyState.isReady ? 'READY' : 'NOT READY'}`);
     
-    if (lobbyState.isHost && window.networkManager) {
-      window.networkManager.startGame();
+    // Send ready state to other players
+    if (window.networkManager) {
+      window.networkManager.setReady(lobbyState.isReady);
     }
     
-    const lobbyScreen = document.getElementById('lobbyScreen');
-    if (lobbyScreen) lobbyScreen.style.display = 'none';
+    // Update UI
+    updateLobbyDisplay();
     
-    if (typeof window.startGameWithCharacter === 'function') {
-      window.startGameWithCharacter(lobbyState.myCharacter);
-    } else {
-      console.log('Waiting for game to load...');
-      setTimeout(() => {
-        if (typeof window.startGameWithCharacter === 'function') {
-          window.startGameWithCharacter(lobbyState.myCharacter);
-        }
-      }, 500);
-    }
+    // Check if all players are ready
+    checkAllPlayersReady();
   });
 }
 

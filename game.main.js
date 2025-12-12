@@ -590,9 +590,10 @@ if (window.networkManager) {
   
   // Handle projectile spawn from other players
   window.networkManager.onSpawnProjectile = (projData) => {
+    // Only process projectiles for our room
+    if (projData.roomCode && projData.roomCode !== window.networkManager.roomCode) return;
     // Don't spawn our own projectiles twice
     if (projData.playerId === window.networkManager.localPlayerId) return;
-    
     const p = new Projectile(projData.x, projData.y, projData.vx, projData.vy, projData.type, projData.damage, projData.id);
     projectiles.push(p);
   };

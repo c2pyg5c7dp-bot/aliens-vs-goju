@@ -23,6 +23,7 @@ class NetworkManager {
     // Event callbacks
     this.onPlayerJoined = null;
     this.onPlayerLeft = null;
+    this.onPlayerReady = null;
     this.onGameStateUpdate = null;
     this.onStartGame = null;
     this.onSpawnWave = null;
@@ -41,6 +42,13 @@ class NetworkManager {
    */
   init() {
     return new Promise((resolve, reject) => {
+      // Check if already initialized
+      if (this.peer && this.peer.open) {
+        console.log('✅ PeerJS already initialized! ID:', this.localPlayerId);
+        resolve(this.localPlayerId);
+        return;
+      }
+
       if (typeof Peer === 'undefined') {
         const error = new Error('PeerJS library not loaded. Please refresh the page.');
         console.error('❌', error.message);
@@ -49,24 +57,48 @@ class NetworkManager {
       }
 
       try {
+        console.log('🔌 Creating new PeerJS connection...');
+        
         this.peer = new Peer({
+          debug: 2, // Enable debug logging
           config: {
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' }
+              { urls: 'stun:stun1.l.google.com:19302' },
+              { urls: 'stun:stun2.l.google.com:19302' }
             ]
           }
         });
 
+        // Set timeout for initialization
+        const initTimeout = setTimeout(() => {
+          if (!this.localPlayerId) {
+            const err = new Error('PeerJS initialization timeout. Please check your internet connection.');
+            console.error('❌', err.message);
+            reject(err);
+          }
+        }, 15000); // 15 second timeout
+
         this.peer.on('open', (id) => {
+          clearTimeout(initTimeout);
           this.localPlayerId = id;
           console.log('✅ PeerJS connected! ID:', id);
           resolve(id);
         });
 
         this.peer.on('error', (err) => {
+          clearTimeout(initTimeout);
           console.error('❌ PeerJS error:', err);
+          console.error('Error type:', err.type);
+          console.error('Error details:', err);
           reject(err);
+        });
+
+        this.peer.on('disconnected', () => {
+          console.warn('⚠️ PeerJS disconnected - attempting reconnect...');
+          if (this.peer && !this.peer.destroyed) {
+            this.peer.reconnect();
+          }
         });
 
         this.peer.on('connection', (conn) => {
@@ -249,6 +281,10 @@ class NetworkManager {
 
       case 'characterSelect':
         this.handleCharacterSelect(data, conn);
+        break;
+
+      case 'playerReady':
+        this.handlePlayerReady(data);
         break;
 
       case 'startGame':
@@ -435,6 +471,22 @@ class NetworkManager {
   }
 
   /**
+   * Handle player ready state
+   */
+  handlePlayerReady(data) {
+    console.log('✅ Player ready:', data.playerId, 'Ready:', data.isReady);
+    
+    if (this.onPlayerReady) {
+      this.onPlayerReady(data.playerId, data.isReady);
+    }
+    
+    // Host forwards ready state to all other clients
+    if (this.isHost) {
+      this.broadcast(data);
+    }
+  }
+
+  /**
    * Send message to host (client only)
    * @param {Object} data - Message data
    */
@@ -475,6 +527,28 @@ class NetworkManager {
       playerId: this.localPlayerId,
       character: character
     };
+
+    if (this.isHost) {
+      this.broadcast(message);
+    } else {
+      this.sendToHost(message);
+    }
+  }
+
+  /**
+   * Send ready state
+   * @param {boolean} isReady - Ready status
+   */
+  setReady(isReady) {
+    if (!this.peer || !this.peer.open) return;
+    
+    const message = {
+      type: 'playerReady',
+      playerId: this.localPlayerId,
+      isReady: isReady
+    };
+
+    console.log('📤 Sending ready state:', isReady);
 
     if (this.isHost) {
       this.broadcast(message);
@@ -634,6 +708,7 @@ class NetworkManager {
     
     this.broadcast({
       type: 'spawnProjectile',
+      roomCode: this.roomCode,
       projectile: {
         id: projectile.id || Math.random().toString(36),
         x: projectile.x,

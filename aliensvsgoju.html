@@ -112,27 +112,30 @@
   </div>
 
   <!-- Join Lobby Modal -->
-  <div id="joinLobbyModal" class="modal-overlay" style="display:none">
+  <div id="joinLobbyModal" class="modal-overlay" style="display:none; z-index: 1000;">
     <div class="modal-content">
       <h2 style="margin-top: 0;">🔗 Join Lobby</h2>
-      <p style="opacity: 0.8; margin-bottom: 20px;">Enter the 4-character code shared by your friend</p>
+      <p style="opacity: 0.8; margin-bottom: 10px;">Enter the FULL code shared by your friend</p>
+      <p style="font-size: 12px; opacity: 0.6; margin-bottom: 20px; color: #7ee787;">
+        Format: <code style="background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 3px;">ABCD|peer-id-string</code>
+      </p>
       
       <div style="margin: 20px 0;">
         <input 
           type="text" 
           id="lobbyCodeInput" 
-          maxlength="4" 
-          placeholder="XXXX"
-          style="font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; padding: 15px; background: rgba(0,0,0,0.5); border: 2px solid #2196F3; border-radius: 8px; color: #2196F3; width: 200px; text-transform: uppercase;"
+          maxlength="100" 
+          placeholder="Paste full code here..."
+          style="font-size: 14px; font-weight: bold; letter-spacing: 1px; text-align: center; padding: 15px; background: rgba(0,0,0,0.5); border: 2px solid #2196F3; border-radius: 8px; color: #2196F3; width: 100%; font-family: monospace;"
         >
         <p id="joinError" style="color: #f44336; margin: 10px 0 0 0; min-height: 20px; font-size: 14px;"></p>
       </div>
 
       <div style="display: flex; gap: 10px; justify-content: center; margin-top: 30px;">
-        <button id="joinLobbyConfirm" class="menu-btn" style="background: #2196F3; flex: 1; max-width: 150px;">
+        <button id="joinLobbyConfirm" class="menu-btn" style="background: #2196F3; flex: 1; max-width: 150px; cursor: pointer; border: none; color: white; font-weight: bold; padding: 12px; border-radius: 4px; transition: all 0.3s;" onmouseover="this.style.background='#1976D2'; this.style.boxShadow='0 4px 12px rgba(33, 150, 243, 0.6)'" onmouseout="this.style.background='#2196F3'; this.style.boxShadow='none'">
           ✓ Join
         </button>
-        <button id="joinLobbyCancel" class="menu-btn" style="background: #666; flex: 1; max-width: 150px;">
+        <button id="joinLobbyCancel" class="menu-btn" style="background: #666; flex: 1; max-width: 150px; cursor: pointer; border: none; color: white; font-weight: bold; padding: 12px; border-radius: 4px; transition: all 0.3s;" onmouseover="this.style.background='#888'; this.style.boxShadow='0 4px 12px rgba(136, 136, 136, 0.6)'" onmouseout="this.style.background='#666'; this.style.boxShadow='none'">
           ✗ Cancel
         </button>
       </div>
@@ -144,15 +147,26 @@
       <h1>🎮 Co-op Lobby</h1>
       <div style="text-align: center; color: var(--fg);">
         
+        <!-- Join Game Button -->
+        <div style="margin: 20px 0; padding: 15px; background: rgba(33, 150, 243, 0.2); border-radius: 8px; border: 2px solid #2196F3;">
+          <h3 style="margin: 0 0 10px 0;">🎮 Join a Game</h3>
+          <p style="font-size: 12px; opacity: 0.7; margin: 0 0 15px 0;">Join an existing co-op lobby using a code</p>
+          <button id="joinGameBtn" style="background: #2196F3; color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: all 0.3s; width: 100%; max-width: 200px; z-index: 100;" onmouseover="this.style.background='#1976D2'; this.style.boxShadow='0 4px 12px rgba(33, 150, 243, 0.6)'" onmouseout="this.style.background='#2196F3'; this.style.boxShadow='none'">🔗 Join Game</button>
+        </div>
+
         <!-- Lobby Code / Invite Section -->
         <div style="margin: 20px 0; padding: 15px; background: rgba(76, 175, 80, 0.2); border-radius: 8px; border: 2px solid #4CAF50;">
-          <h3 style="margin: 0 0 10px 0;">📋 Lobby Code</h3>
+          <h3 style="margin: 0 0 10px 0;">📋 Lobby Code (You are HOST)</h3>
           <div style="display: flex; gap: 10px; align-items: center; justify-content: center;">
-            <input type="text" id="lobbyCodeDisplay" readonly style="font-size: 24px; font-weight: bold; letter-spacing: 3px; text-align: center; padding: 10px; background: rgba(0,0,0,0.5); border: 2px solid #4CAF50; border-radius: 4px; color: #4CAF50; width: 200px;" value="XXXX">
-            <button id="copyLobbyCode" style="background: #4CAF50; padding: 10px 20px;">📋 Copy</button>
-            <button id="shareLobbyCode" style="background: #2196F3; padding: 10px 20px;">🔗 Share</button>
+            <input type="text" id="lobbyCodeDisplay" readonly style="font-size: 16px; font-weight: bold; letter-spacing: 1px; text-align: center; padding: 10px; background: rgba(0,0,0,0.5); border: 2px solid #4CAF50; border-radius: 4px; color: #4CAF50; width: 100%; max-width: 400px; font-family: monospace;" value="XXXX">
           </div>
-          <p style="font-size: 12px; opacity: 0.7; margin: 5px 0 0 0;">Share this code with friends to invite them!</p>
+          <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+            <button id="copyLobbyCode" style="background: #4CAF50; padding: 10px 20px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#45a049'" onmouseout="this.style.background='#4CAF50'">📋 Copy Code</button>
+            <button id="shareLobbyCode" style="background: #2196F3; padding: 10px 20px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#1976D2'" onmouseout="this.style.background='#2196F3'">🔗 Share Link</button>
+          </div>
+          <p style="font-size: 12px; opacity: 0.8; margin: 10px 0 0 0; color: #7ee787;">
+            <strong>⚠️ Important:</strong> Share the FULL code above (including everything after the | symbol). Friends paste it in "Join Game".
+          </p>
         </div>
 
         <!-- Character Selection in Lobby -->
@@ -190,7 +204,7 @@
             <p>Loading...</p>
           </div>
         </div>
-        <button id="startCoopBtn" style="background: #4CAF50; padding: 12px 24px; font-size: 16px; font-weight: bold;">▶️ Start Co-op Game</button>
+        <button id="startCoopBtn" style="background: #4CAF50; padding: 12px 24px; font-size: 16px; font-weight: bold; border: none; color: white; border-radius: 4px; cursor: pointer; transition: all 0.3s;">⚡ Ready Up</button>
         <button id="leaveLobbyBtn" style="background: #f44336; margin-left: 12px; padding: 12px 24px;">❌ Leave Lobby</button>
       </div>
     </div>
@@ -662,6 +676,22 @@
       <div style="font-weight:bold; margin-bottom:4px; color:#ff0">🚀 Init Debug</div>
       <div id="initDebugSection" style="font-size:10px; color:#0f0; line-height:1.4"></div>
     </div>
+    <div style="margin-top:8px; padding:8px; background:#111; border:1px solid #2196F3; border-radius:4px">
+      <div style="font-weight:bold; margin-bottom:4px; color:#2196F3">🌐 Multiplayer Status</div>
+      <div id="multiplayerDebugSection" style="font-size:10px; color:#64B5F6; line-height:1.6">
+        <div>PeerJS: <span id="peerJsStatus">❓</span></div>
+        <div>NetworkManager: <span id="networkManagerStatus">❓</span></div>
+        <div>Peer Connection: <span id="peerConnectionStatus">❓</span></div>
+        <div>Local Peer ID: <span id="localPeerId" style="color:#00ff00; font-family:monospace; font-size:9px">N/A</span></div>
+        <div>Room Code: <span id="roomCodeStatus" style="color:#00ff00; font-weight:bold">None</span></div>
+        <div>Is Host: <span id="isHostStatus">❓</span></div>
+        <div>Connected Players: <span id="connectedPlayersCount">0</span></div>
+        <div style="margin-top:4px; padding-top:4px; border-top:1px solid #333; display:flex; gap:4px; flex-direction:column;">
+          <button id="mpRefreshStatus" style="padding:4px 8px; background:#2196F3; color:#000; border:none; cursor:pointer; font-size:10px; font-weight:bold; width:100%">🔄 Refresh Status</button>
+          <button id="mpInitialize" style="padding:4px 8px; background:#4CAF50; color:#000; border:none; cursor:pointer; font-size:10px; font-weight:bold; width:100%">🔌 Initialize PeerJS</button>
+        </div>
+      </div>
+    </div>
     </div>
   </div>
 
@@ -680,6 +710,9 @@
 
   <!-- Lobby functionality loaded as external script for Discord compatibility -->
   <script defer src="./lobby.js?v=7"></script>
+
+  <!-- Multiplayer debug monitor -->
+  <script defer src="./debug-multiplayer.js?v=1"></script>
 
   <!-- Global error handler -->
   <script src="./error-handler.js?v=5"></script>
