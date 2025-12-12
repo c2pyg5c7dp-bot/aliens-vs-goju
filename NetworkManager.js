@@ -58,7 +58,6 @@ class NetworkManager {
 
       try {
         console.log('🔌 Creating new PeerJS connection...');
-        
         this.peer = new Peer({
           debug: 2, // Enable debug logging
           config: {
@@ -73,8 +72,9 @@ class NetworkManager {
         // Set timeout for initialization
         const initTimeout = setTimeout(() => {
           if (!this.localPlayerId) {
-            const err = new Error('PeerJS initialization timeout. Please check your internet connection.');
-            console.error('❌', err.message);
+            const err = new Error('PeerJS initialization timeout. Please check your internet connection, firewall, or if PeerJS servers are blocked.');
+            console.error('❌ [PeerJS Timeout]', err.message);
+            alert('PeerJS connection timed out.\n\nPossible causes:\n- No internet connection\n- Firewall or network blocking WebRTC\n- PeerJS/STUN servers unreachable');
             reject(err);
           }
         }, 15000); // 15 second timeout
@@ -88,14 +88,21 @@ class NetworkManager {
 
         this.peer.on('error', (err) => {
           clearTimeout(initTimeout);
-          console.error('❌ PeerJS error:', err);
-          console.error('Error type:', err.type);
-          console.error('Error details:', err);
+          console.error('❌ [PeerJS Error]', err);
+          alert('PeerJS error: ' + (err && err.message ? err.message : err));
+          if (err.type === 'unavailable-id') {
+            alert('Peer ID is already in use. Try refreshing the page.');
+          } else if (err.type === 'network') {
+            alert('Network error: Please check your internet connection or firewall.');
+          } else if (err.type === 'disconnected') {
+            alert('Disconnected from PeerJS server. Trying to reconnect...');
+          }
           reject(err);
         });
 
         this.peer.on('disconnected', () => {
           console.warn('⚠️ PeerJS disconnected - attempting reconnect...');
+          alert('PeerJS disconnected. Attempting to reconnect...');
           if (this.peer && !this.peer.destroyed) {
             this.peer.reconnect();
           }
@@ -107,6 +114,7 @@ class NetworkManager {
         });
       } catch (error) {
         console.error('❌ Failed to initialize PeerJS:', error);
+        alert('Failed to initialize PeerJS: ' + error.message);
         reject(error);
       }
     });
@@ -508,38 +516,41 @@ class NetworkManager {
       if (conn !== excludeConn && conn.open) {
         try {
           conn.send(data);
-        } catch (err) {
-          console.error('❌ Failed to send to', conn.peer, err);
+        if (!this.peer) {
+          console.error('❌ Peer not initialized!');
+          alert('PeerJS is not initialized. Please refresh the page.');
+          return false;
         }
-      }
-    });
-  }
 
-  /**
-   * Send character selection
-   * @param {string} character - Selected character
-   */
-  selectCharacter(character) {
-    if (!this.peer || !this.peer.open) return;
-    
-    const message = {
-      type: 'characterSelect',
-      playerId: this.localPlayerId,
-      character: character
-    };
+        this.roomCode = roomCode.toUpperCase();
 
-    if (this.isHost) {
-      this.broadcast(message);
-    } else {
-      this.sendToHost(message);
-    }
-  }
+        // Check for room in local storage (same browser testing)
+        const myRooms = JSON.parse(localStorage.getItem('myRooms') || '{}');
+        let hostId = myRooms[this.roomCode]?.hostId;
 
-  /**
-   * Send ready state
-   * @param {boolean} isReady - Ready status
-   */
-  setReady(isReady) {
+        // Check shared room codes (cross-device)
+        if (!hostId) {
+          const sharedRooms = JSON.parse(localStorage.getItem('sharedRoomCodes') || '{}');
+          hostId = sharedRooms[this.roomCode];
+        }
+
+        if (!hostId) {
+          console.error('❌ Room not found:', this.roomCode);
+          alert('Room not found. The host may not be online or the code is incorrect.');
+          return false;
+        }
+
+        console.log('🔗 Joining room:', this.roomCode, '| Host ID:', hostId);
+
+        try {
+          this.conn = this.peer.connect(hostId, { reliable: true });
+          this.handleConnection(this.conn);
+          return true;
+        } catch (error) {
+          console.error('❌ Failed to join room:', error);
+          alert('Failed to join room: ' + error.message);
+          return false;
+        }
     if (!this.peer || !this.peer.open) return;
     
     const message = {
